@@ -1,0 +1,10 @@
+node_modules/
+temp/
+.env
+*.log
+*.zip
+*.blend
+*.fbx
+__pycache__/
+.DS_Store
+.vscode/
