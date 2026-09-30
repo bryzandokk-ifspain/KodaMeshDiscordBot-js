@@ -1,4 +1,4 @@
-# RobloxImageBot
+# KodaMeshDiscordBot
 
 Discord bot to convert and process Minecraft/Roblox resources and work with Roblox Open Cloud and OpenAI
 
