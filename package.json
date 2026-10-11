@@ -1,16 +1,13 @@
 {
   "name": "robloximagebot",
-  "version": "1.0.0",
-  "description": "Discord bot for Roblox image, texture pack, mesh, audio, and resource pack utilities.",
+  "version": "2.0.0",
+  "description": "Bot de Discord para Roblox + Bridge Duels + Minecraft (open source)",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "test": "node --check index.js"
+    "dev": "nodemon index.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "MIT",
-  "type": "commonjs",
+  "license": "ISC",
   "dependencies": {
     "@gltf-transform/core": "^4.5.0",
     "@gltf-transform/functions": "^4.5.0",
@@ -23,6 +20,7 @@
     "form-data": "^4.0.6",
     "fzstd": "^0.1.1",
     "node-fetch": "^2.7.0",
+    "openai": "^6.49.0",
     "sharp": "^0.35.4",
     "three": "^0.160.0",
     "unzipper": "^0.12.5"
