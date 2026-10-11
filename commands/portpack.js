@@ -1,5 +1,15 @@
 const {
-    SlashCommandBuilder
+    SlashCommandBuilder,
+    ModalBuilder,
+    TextInputBuilder,
+    TextInputStyle,
+    ActionRowBuilder,
+    StringSelectMenuBuilder,
+    ButtonBuilder,
+    ButtonStyle,
+    AttachmentBuilder,
+    ChannelType,
+    EmbedBuilder
 } = require('discord.js');
 
 const sharp = require('sharp');
@@ -24,7 +34,7 @@ const execPromise =
 
 
 // ============================================================
-// CONFIGURACIÓN
+// CONFIG
 // ============================================================
 
 const VALID_SIZES = [
@@ -36,111 +46,59 @@ const VALID_SIZES = [
     512
 ];
 
-
-// ============================================================
-// TEXTURA FINAL
-// ============================================================
-
 const FINAL_SIZE = 1024;
 
+const CONCURRENCY = 8;
 
-// ============================================================
-// CONCURRENCIA GENERAL
-// ============================================================
+const MAX_RETRIES = 2;
+const RETRY_BASE_DELAY = 800;
 
-const CONCURRENCY = 3;
+const BLENDER_TIMEOUT = 90000;
 
+const ASSET_POLL_INTERVAL = 500;
+const ASSET_POLL_ATTEMPTS = 180;
 
-// ============================================================
-// REINTENTOS GENERALES
-// ============================================================
-
-const MAX_RETRIES = 4;
-
-const RETRY_BASE_DELAY = 2000;
-
-
-// ============================================================
-// LUAU
-// ============================================================
-//
-// IMPORTANTE:
-//
-// Roblox limita la creación de tareas Luau.
-//
-// Por eso las tareas Luau:
-//
-// 1. Nunca se crean simultáneamente.
-// 2. Se procesan mediante una cola global.
-// 3. Si Roblox devuelve 429, esperamos.
-// 4. Después volvemos a intentar.
-//
-// ============================================================
-
-const LUAU_RETRY_DELAY_MS = 120000;
-
-// Tiempo mínimo entre creaciones de tareas Luau.
-// Esto evita volver a golpear el rate limit.
-const LUAU_MIN_INTERVAL_MS = 120000;
-
-
-// Cola global de Luau.
-//
-// Todas las llamadas a extractMeshIdWithLuau()
-// pasan por aquí.
-let luauQueue =
-    Promise.resolve();
-
-
-// Último momento en que se creó una tarea Luau.
-let lastLuauTaskCreation =
-    0;
-
-
-// ============================================================
-// BLENDER
-// ============================================================
+const LUAU_POLL_INTERVAL = 500;
+const LUAU_POLL_ATTEMPTS = 240;
 
 const BLENDER_PATH =
-    'C:\\Program Files\\Blender Foundation\\Blender 4.4\\blender.exe';
-
-
-// ============================================================
-// ROBLOX
-// ============================================================
+    'C:\\Program Files\\Blender Foundation\\Blender 5.2\\blender.exe';
 
 const UNIVERSE_ID =
-    process.env.ROBLOX_UNIVERSE_ID;
+    '10764746325';
 
 const PLACE_ID =
-    process.env.ROBLOX_PLACE_ID;
-
-if (!UNIVERSE_ID || !PLACE_ID) {
-    throw new Error('Faltan ROBLOX_UNIVERSE_ID o ROBLOX_PLACE_ID en .env.');
-}
+    '113531224892646';
 
 
 // ============================================================
-// ROTACIÓN
+// MESH ROTATIONS
 // ============================================================
 
 const ROTATION_X = 90;
-
 const ROTATION_Y = -45;
-
 const ROTATION_Z = 0;
 
 
 // ============================================================
-// RESOURCE PACK
+// PATHS
 // ============================================================
 
 const ITEMS_PATH =
     'assets/minecraft/textures/items';
 
+const WOOL_PATH =
+    'assets/minecraft/textures/blocks';
+
+const SKY_PATH =
+    'assets/minecraft/mcpatcher/sky/world0';
+
+const GUI_ICONS_PATH =
+    'assets/minecraft/textures/gui/icons.png';
+
 
 // ============================================================
-// TEXTURAS REQUERIDAS
+// REQUIRED ITEM IMAGES
 // ============================================================
 
 const REQUIRED_IMAGES = [
@@ -156,235 +114,375 @@ const REQUIRED_IMAGES = [
     'diamond_sword.png',
     'diamond_pickaxe.png',
 
+    'diamond_axe.png',
+
     'emerald.png',
+
+    'ender_pearl.png',
 
     'gold_sword.png',
     'gold_pickaxe.png',
+
+    'gold_axe.png',
 
     'iron_ingot.png',
     'iron_sword.png',
     'iron_pickaxe.png',
 
+    'iron_axe.png',
+
     'wood_pickaxe.png',
-    'wood_sword.png'
+    'wood_sword.png',
+
+    'wood_axe.png',
+
+    'shears.png',
+
+    'potion_bottle_empty.png',
+
+    'fireball.png'
 
 ];
 
 
 // ============================================================
-// MAPEO
+// OPTIONAL WOOL IMAGES
+// ============================================================
+
+const WOOL_IMAGES = [
+
+    'wool_colored_green.png',
+    'wool_colored_blue.png',
+    'wool_colored_orange.png',
+    'wool_colored_gray.png',
+    'wool_colored_cyan.png',
+    'wool_colored_yellow.png',
+    'wool_colored_purple.png',
+    'wool_colored_red.png'
+
+];
+
+
+// ============================================================
+// WOOL MAPPING
+// ============================================================
+
+const WOOL_MAPPINGS = {
+
+    'wool_colored_green.png':
+        'ClayGreen',
+
+    'wool_colored_blue.png':
+        'ClayBlue',
+
+    'wool_colored_orange.png':
+        'ClayOrange',
+
+    'wool_colored_gray.png':
+        'ClayGrey',
+
+    'wool_colored_cyan.png':
+        'ClayCyan',
+
+    'wool_colored_yellow.png':
+        'ClayYellow',
+
+    'wool_colored_purple.png':
+        'ClayPurple',
+
+    'wool_colored_red.png':
+        'ClayRed'
+
+};
+
+
+// ============================================================
+// SKY SOURCES
+// ============================================================
+
+const SKY_SOURCES = [
+
+    'cloud1.png',
+    'cloud2.png',
+    'starfield01.png',
+    'starfield02.png',
+    'starfield03.png',
+    'starfield04.png',
+    'skybox.png',
+    'skybox1.png',
+    'skybox2.png',
+    'skybox3.png',
+    'starfield.png'
+
+];
+
+
+// ============================================================
+// SKY MAPPING
+// ============================================================
+
+const SKY_MAPPINGS = {
+
+    bottom: 'SkyBottom',
+    top: 'SkyTop',
+    left: 'SkyLeft',
+    back: 'SkyBack',
+    right: 'SkyRight',
+    front: 'SkyFront'
+
+};
+
+
+// ============================================================
+// ITEM MAPPING
 // ============================================================
 
 const IMAGE_MAPPINGS = {
 
     'bow_standby.png': {
-
-        mesh: [
-            'Bow0Mesh'
-        ],
-
-        texture: [
-            'Bow0Texture'
-        ]
-
+        mesh: ['Bow0Mesh'],
+        texture: ['Bow0Texture']
     },
-
 
     'bow_pulling_0.png': {
-
-        mesh: [
-            'Bow1Mesh'
-        ],
-
-        texture: [
-            'Bow1Texture'
-        ]
-
+        mesh: ['Bow1Mesh'],
+        texture: ['Bow1Texture']
     },
-
 
     'bow_pulling_1.png': {
-
-        mesh: [
-            'Bow2Mesh'
-        ],
-
-        texture: [
-            'Bow2Texture'
-        ]
-
+        mesh: ['Bow2Mesh'],
+        texture: ['Bow2Texture']
     },
-
 
     'bow_pulling_2.png': {
-
-        mesh: [
-            'Bow3Mesh'
-        ],
-
-        texture: [
-            'Bow3Texture'
-        ]
-
+        mesh: ['Bow3Mesh'],
+        texture: ['Bow3Texture']
     },
 
-
     'diamond.png': {
-
-        mesh: [
-            'DiamondMesh'
-        ],
-
+        mesh: ['DiamondMesh'],
         texture: [
             'DiamondTexture',
             'DiamondVPImage'
         ]
-
     },
 
-
     'diamond_sword.png': {
-
-        mesh: [
-            'SwordMesh'
-        ],
-
+        mesh: ['SwordMesh'],
         texture: [
             'DiamondSwordTexture',
             'DiamondSwordVPImage'
         ]
-
     },
 
-
     'emerald.png': {
-
-        mesh: [
-            'EmeraldMesh'
-        ],
-
+        mesh: ['EmeraldMesh'],
         texture: [
             'EmeraldTexture',
             'EmeraldVPImage'
         ]
-
     },
 
+    'ender_pearl.png': {
+        mesh: ['PearlMesh'],
+        texture: [
+            'PearlTexture',
+            'PearlVPImage'
+        ]
+    },
 
     'gold_sword.png': {
-
         mesh: [],
-
         texture: [
             'GoldSwordTexture',
             'GoldSwordVPImage'
         ]
-
     },
 
-
     'iron_sword.png': {
-
         mesh: [],
-
         texture: [
             'SwordTexture',
             'SwordVPImage'
         ]
-
     },
 
-
     'wood_sword.png': {
-
         mesh: [],
-
         texture: [
             'WoodenSwordTexture',
             'WoodenSwordVPImage'
         ]
-
     },
 
-
     'diamond_pickaxe.png': {
-
-        mesh: [
-            'PickaxeMesh'
-        ],
-
+        mesh: ['PickaxeMesh'],
         texture: [
             'DiamondPickaxeTexture',
             'DiamondPickaxeVPImage'
         ]
-
     },
 
-
     'gold_pickaxe.png': {
-
         mesh: [],
-
         texture: [
             'GoldPickaxeTexture',
             'GoldPickaxeVPImage'
         ]
-
     },
 
-
     'iron_pickaxe.png': {
-
         mesh: [],
-
         texture: [
             'PickaxeTexture',
             'PickaxeVPImage'
         ]
-
     },
 
-
     'wood_pickaxe.png': {
-
         mesh: [],
-
         texture: [
             'WoodenPickaxeTexture',
             'WoodenPickaxeVPImage'
         ]
-
     },
 
-
     'apple_golden.png': {
-
-        mesh: [
-            'GoldAppleMesh'
-        ],
-
+        mesh: ['GoldAppleMesh'],
         texture: [
             'GoldAppleTexture',
             'GoldAppleVPImage'
         ]
-
     },
 
-
     'iron_ingot.png': {
-
-        mesh: [
-            'IronMesh'
-        ],
-
+        mesh: ['IronMesh'],
         texture: [
             'IronTexture',
             'IronVPImage'
         ]
+    },
 
+    'diamond_axe.png': {
+        mesh: ['AxeMesh'],
+        texture: [
+            'DiamondAxeTexture',
+            'DiamondAxeVPImage'
+        ]
+    },
+
+    'gold_axe.png': {
+        mesh: [],
+        texture: [
+            'GoldAxeTexture',
+            'GoldAxeVPImage'
+        ]
+    },
+
+    'iron_axe.png': {
+        mesh: [],
+        texture: [
+            'AxeTexture',
+            'AxeVPImage'
+        ]
+    },
+
+    'wood_axe.png': {
+        mesh: [],
+        texture: [
+            'WoodenAxeTexture',
+            'WoodenAxeVPImage'
+        ]
+    },
+
+    'shears.png': {
+        mesh: ['ShearsMesh'],
+        texture: [
+            'ShearsTexture',
+            'ShearsVPImage'
+        ]
+    },
+
+    'potion_bottle_empty.png': {
+        mesh: [
+            'SpeedPotionMesh',
+            'JumpPotionMesh'
+        ],
+        texture: [
+            'SpeedPotionTexture',
+            'SpeedPotionVPImage',
+            'JumpPotionTexture',
+            'JumpPotionVPImage'
+        ]
+    },
+
+    'fireball.png': {
+        mesh: ['FireballMesh'],
+        texture: [
+            'FireballTexture',
+            'FireballVPImage'
+        ]
     }
 
 };
+
+
+const RESOURCE_OPTIONS = [
+
+    ...REQUIRED_IMAGES.map(
+        imageName => ({
+            value:
+                `item:${imageName}`,
+
+            label:
+                getResourceLabel(
+                    imageName
+                ),
+
+            description:
+                `${ITEMS_PATH}/${imageName}`,
+
+            emoji:
+                '🧩'
+        })
+    ),
+
+    ...WOOL_IMAGES.map(
+        woolName => ({
+            value:
+                `wool:${woolName}`,
+
+            label:
+                getResourceLabel(
+                    woolName
+                ),
+
+            description:
+                `${WOOL_PATH}/${woolName}`,
+
+            emoji:
+                '🧶'
+        })
+    ),
+
+    {
+        value: 'sky',
+        label: 'Sky / Cielo',
+        description:
+            `${SKY_PATH}/ • selecciona después el sky`,
+        emoji: '🌌'
+    },
+
+    {
+        value: 'crosshair',
+        label: 'Crosshair',
+        description:
+            GUI_ICONS_PATH,
+        emoji: '🎯'
+    }
+
+];
+
 
 
 // ============================================================
@@ -394,7 +492,6 @@ const IMAGE_MAPPINGS = {
 const BASE_PACK = {
 
     "BlocksVPImage": "0",
-
     "BowVPImage": "0",
 
     "Bow0Mesh": "92849804961177",
@@ -426,13 +523,12 @@ const BASE_PACK = {
     "DiamondMesh": "89942433665877",
 
     "DiamondPickaxeTexture": "100600191665018",
-
     "DiamondPickaxeVPImage": "79286119024383",
 
     "DiamondRotation": [
         0,
         0,
-        35
+        -35
     ],
 
     "DiamondScale": [
@@ -442,11 +538,9 @@ const BASE_PACK = {
     ],
 
     "DiamondSwordTexture": "70607247755398",
-
     "DiamondSwordVPImage": "121813241620253",
 
     "DiamondTexture": "110971495548600",
-
     "DiamondVPImage": "80980212931542",
 
     "EmeraldMesh": "103144736944926",
@@ -454,7 +548,7 @@ const BASE_PACK = {
     "EmeraldRotation": [
         0,
         0,
-        35
+        -35
     ],
 
     "EmeraldScale": [
@@ -464,7 +558,6 @@ const BASE_PACK = {
     ],
 
     "EmeraldTexture": "76814700693963",
-
     "EmeraldVPImage": "114574104351628",
 
     "GoldAppleEatingScale": [
@@ -488,15 +581,12 @@ const BASE_PACK = {
     ],
 
     "GoldAppleTexture": "134804404631534",
-
     "GoldAppleVPImage": "87840797652428",
 
     "GoldPickaxeTexture": "100702988360136",
-
     "GoldPickaxeVPImage": "93648784178538",
 
     "GoldSwordTexture": "128274654568144",
-
     "GoldSwordVPImage": "102241119116435",
 
     "IronMesh": "140129701237490",
@@ -504,7 +594,7 @@ const BASE_PACK = {
     "IronRotation": [
         0,
         0,
-        35
+        -35
     ],
 
     "IronScale": [
@@ -514,8 +604,17 @@ const BASE_PACK = {
     ],
 
     "IronTexture": "92208499998673",
-
     "IronVPImage": "75536662764889",
+
+    "PearlMesh": "0",
+    "PearlTexture": "0",
+    "PearlVPImage": "0",
+
+    "PearlRotation": [
+        0,
+        0,
+        -35
+    ],
 
     "PickaxeMesh": "125989025789786",
 
@@ -532,7 +631,6 @@ const BASE_PACK = {
     ],
 
     "PickaxeTexture": "133923679754669",
-
     "PickaxeVPImage": "85938952726145",
 
     "ReducedBlockLag": true,
@@ -564,535 +662,1842 @@ const BASE_PACK = {
     ],
 
     "SwordTexture": "97652904601266",
-
     "SwordVPImage": "85738183333201",
 
     "WoodenPickaxeTexture": "130067289543263",
-
     "WoodenPickaxeVPImage": "81722050094564",
 
     "WoodenSwordTexture": "95597552216546",
+    "WoodenSwordVPImage": "137681027313560",
 
-    "WoodenSwordVPImage": "137681027313560"
+    "AxeMesh": "0",
+
+    "AxeRotation": [
+        0,
+        180,
+        0
+    ],
+
+    "DiamondAxeTexture": "0",
+    "DiamondAxeVPImage": "0",
+
+    "GoldAxeTexture": "0",
+    "GoldAxeVPImage": "0",
+
+    "AxeTexture": "0",
+    "AxeVPImage": "0",
+
+    "WoodenAxeTexture": "0",
+    "WoodenAxeVPImage": "0",
+
+    "ShearsMesh": "0",
+    "ShearsTexture": "0",
+    "ShearsVPImage": "0",
+
+    "ShearsRotation": [
+        0,
+        0,
+        -35
+    ],
+
+    "SpeedPotionMesh": "0",
+    "SpeedPotionTexture": "0",
+    "SpeedPotionVPImage": "0",
+
+    "JumpPotionMesh": "0",
+    "JumpPotionTexture": "0",
+    "JumpPotionVPImage": "0",
+
+    "FireballMesh": "0",
+    "FireballTexture": "0",
+    "FireballVPImage": "0",
+
+    "ClayGreen": "0",
+    "ClayBlue": "0",
+    "ClayOrange": "0",
+    "ClayGrey": "0",
+    "ClayCyan": "0",
+    "ClayYellow": "0",
+    "ClayPurple": "0",
+    "ClayRed": "0",
+
+    "SkyBottom": "0",
+    "SkyTop": "0",
+    "SkyLeft": "0",
+    "SkyBack": "0",
+    "SkyRight": "0",
+    "SkyFront": "0"
 
 };
 
 
 // ============================================================
-// COMANDO
+// COMMAND
 // ============================================================
 
 module.exports = {
 
     data:
-
         new SlashCommandBuilder()
-
-            .setName(
-                'portpack'
-            )
-
+            .setName('portpack')
             .setDescription(
-                'Convierte un Minecraft Resource Pack en un JSON de Bridge Duels'
+                'Convert a 1.8.9 texture pack (.zip) into a Bridge Duels JSON'
             )
 
-            .addAttachmentOption(
-                option =>
-                    option
-
-                        .setName(
-                            'pack'
-                        )
-
+            .addSubcommand(
+                sub =>
+                    sub
+                        .setName('pack')
                         .setDescription(
-                            'Resource Pack .zip'
+                            'Sube un Resource Pack .zip'
                         )
+                        .addAttachmentOption(
+                            option =>
+                                option
+                                    .setName('file')
+                                    .setDescription(
+                                        'Resource Pack .zip'
+                                    )
+                                    .setRequired(true)
+                        )
+            )
 
-                        .setRequired(
-                            true
+            .addSubcommand(
+                sub =>
+                    sub
+                        .setName('url')
+                        .setDescription(
+                            'Use a MediaFire link'
                         )
             ),
 
+    async execute(interaction) {
 
-    // ========================================================
-    // EXECUTE
-    // ========================================================
+        const subcommand =
+            interaction.options.getSubcommand();
 
-    async execute(
-        interaction
-    ) {
+        if (
+            subcommand === 'url'
+        ) {
 
-        console.log();
-        console.log(
-            '============================================================'
-        );
-        console.log(
-            '[PORTPACK] Starting...'
-        );
-        console.log(
-            '============================================================'
-        );
+            const modal =
+                new ModalBuilder()
+                    .setCustomId(
+                        'portpack_url_modal'
+                    )
+                    .setTitle(
+                        'PortPack • MediaFire'
+                    );
 
+            const urlInput =
+                new TextInputBuilder()
+                    .setCustomId(
+                        'portpack_url'
+                    )
+                    .setLabel(
+                        'Enlace de MediaFire'
+                    )
+                    .setPlaceholder(
+                        'https://www.mediafire.com/file/...'
+                    )
+                    .setStyle(
+                        TextInputStyle.Short
+                    )
+                    .setRequired(true)
+                    .setMaxLength(1000);
 
-        // ====================================================
-        // VALIDAR INTERACCIÓN
-        // ====================================================
+            modal.addComponents(
+                new ActionRowBuilder()
+                    .addComponents(
+                        urlInput
+                    )
+            );
+
+            await interaction.showModal(
+                modal
+            );
+
+            return;
+        }
+
+        const attachment =
+            interaction.options.getAttachment(
+                'file'
+            );
 
         if (
             !interaction.deferred &&
             !interaction.replied
         ) {
 
-            throw new Error(
-                'La interacción no fue reconocida por Discord antes de ejecutar el comando.'
-            );
-
+            await interaction.deferReply();
         }
-
-
-        // ====================================================
-        // OBTENER ZIP
-        // ====================================================
-
-        const attachment =
-            interaction.options.getAttachment(
-                'pack'
-            );
-
-
-        if (
-            !attachment
-        ) {
-
-            await safeEditReply(
-                interaction,
-                '❌ No se proporcionó ningún Resource Pack.'
-            );
-
-            return;
-
-        }
-
-
-        const fileName =
-            String(
-                attachment.name ||
-                ''
-            ).toLowerCase();
-
-
-        if (
-            !fileName.endsWith(
-                '.zip'
-            )
-        ) {
-
-            await safeEditReply(
-                interaction,
-                '❌ El archivo debe ser un **Resource Pack .zip**.'
-            );
-
-            return;
-
-        }
-
-
-        // ====================================================
-        // TEMP
-        // ====================================================
-
-        const tempRoot =
-            path.join(
-                __dirname,
-                '..',
-                'temp'
-            );
-
-
-        fs.mkdirSync(
-            tempRoot,
-            {
-                recursive: true
-            }
-        );
-
-
-        const jobId =
-            `portpack_${Date.now()}_${Math.random()
-                .toString(36)
-                .slice(2, 8)}`;
-
-
-        const tempDir =
-            path.join(
-                tempRoot,
-                jobId
-            );
-
-
-        fs.mkdirSync(
-            tempDir,
-            {
-                recursive: true
-            }
-        );
-
-
-        const zipPath =
-            path.join(
-                tempDir,
-                'resourcepack.zip'
-            );
-
 
         try {
 
-            // =================================================
-            // PROGRESO
-            // =================================================
-
-            await updateProgress(
-                interaction,
-                1,
-                'Descargando Resource Pack...'
-            );
-
-
-            // =================================================
-            // DESCARGAR ZIP
-            // =================================================
-
-            console.log(
-                `[PORTPACK] Downloading: ${attachment.url}`
-            );
-
-
-            const response =
-                await retryOperation(
-
-                    async () => {
-
-                        return axios.get(
-
-                            attachment.url,
-
-                            {
-
-                                responseType:
-                                    'arraybuffer',
-
-                                timeout:
-                                    180000,
-
-                                maxContentLength:
-                                    150 * 1024 * 1024,
-
-                                maxBodyLength:
-                                    150 * 1024 * 1024
-
-                            }
-
-                        );
-
-                    },
-
-                    'descarga del Resource Pack',
-
-                    MAX_RETRIES
-
+            const selectedResources =
+                await selectResources(
+                    interaction
                 );
 
-
-            fs.writeFileSync(
-
-                zipPath,
-
-                Buffer.from(
-                    response.data
-                )
-
-            );
-
-
-            console.log(
-                `[PORTPACK] ZIP saved: ${zipPath}`
-            );
-
-
-            // =================================================
-            // ABRIR ZIP
-            // =================================================
-
-            await updateProgress(
-                interaction,
-                5,
-                'Abriendo Resource Pack y buscando las texturas...'
-            );
-
-
-            const directory =
-                await unzipper.Open.file(
-                    zipPath
-                );
-
-
-            // =================================================
-            // BUSCAR ARCHIVOS
-            // =================================================
-
-            const filesByName =
-                new Map();
-
-
-            for (
-                const file of directory.files
+            if (
+                !selectedResources ||
+                selectedResources.length === 0
             ) {
 
-                if (
-                    !file ||
-                    !file.path
-                ) {
-
-                    continue;
-
-                }
-
-
-                const normalized =
-                    normalizeZipPath(
-                        file.path
-                    );
-
-
-                if (
-                    normalized.endsWith('/')
-                ) {
-
-                    continue;
-
-                }
-
-
-                const lower =
-                    normalized.toLowerCase();
-
-
-                if (
-                    lower.startsWith(
-                        `${ITEMS_PATH.toLowerCase()}/`
-                    )
-                ) {
-
-                    filesByName.set(
-                        lower,
-                        file
-                    );
-
-                }
-
+                throw new Error(
+                    'You must select at least one resource'
+                );
             }
 
+            await processPack(
+                interaction,
+                attachment,
+                selectedResources
+            );
 
-            const foundFiles = {};
+        } catch (error) {
 
-            const missingImages = [];
+            console.error(
+                '[PORTPACK SELECT]',
+                error
+            );
 
+            await safeEditReply(
+                interaction,
+                `❌ **Error:**\n\`${String(
+                    error?.message ||
+                    'Error desconocido.'
+                ).slice(0, 1800)}\``
+            );
+        }
+    },
+
+
+    async handleUrlModal(interaction) {
+
+        try {
+
+            await interaction.deferReply();
+
+            const url =
+                interaction.fields
+                    .getTextInputValue(
+                        'portpack_url'
+                    )
+                    .trim();
+
+            if (!url) {
+
+                throw new Error(
+                    'No link was provided'
+                );
+            }
+
+            if (
+                !/^https?:\/\/(www\.)?mediafire\.com\//i.test(
+                    url
+                )
+            ) {
+
+                throw new Error(
+                    'The link has to be from MediaFire'
+                );
+            }
+
+            const selectedResources =
+                await selectResources(
+                    interaction
+                );
+
+            if (
+                !selectedResources ||
+                selectedResources.length === 0
+            ) {
+
+                throw new Error(
+                    'You must select at least one resource'
+                );
+            }
+
+            await processPackFromUrl(
+                interaction,
+                url,
+                selectedResources
+            );
+
+        } catch (error) {
+
+            console.error(
+                '[PORTPACK URL]',
+                error
+            );
+
+            await safeEditReply(
+                interaction,
+                `❌ **Error:**\n\`${String(
+                    error?.message ||
+                    'Error desconocido.'
+                ).slice(0, 1800)}\``
+            );
+        }
+    }
+
+};
+
+
+// RESOURCE SELECTOR
+// ============================================================
+
+async function selectResources(
+    interaction
+) {
+
+    const customPrefix =
+        `portpack_resources_${Date.now()}_${Math.random()
+            .toString(36)
+            .slice(2, 8)}`;
+
+    const menuCustomIds = [
+        `${customPrefix}_1`,
+        `${customPrefix}_2`
+    ];
+
+    const continueCustomId =
+        `${customPrefix}_continue`;
+
+    const selectAllCustomIds = [
+        `${customPrefix}_select_all_1`,
+        `${customPrefix}_select_all_2`
+    ];
+
+    const chunks = [];
+
+    for (
+        let i = 0;
+        i < RESOURCE_OPTIONS.length;
+        i += 25
+    ) {
+
+        chunks.push(
+            RESOURCE_OPTIONS.slice(
+                i,
+                i + 25
+            )
+        );
+    }
+
+    const selected =
+        new Set();
+
+
+    // ========================================================
+    // RENDER SELECT MENUS
+    // ========================================================
+    // The important part here is that "Seleccionar todo" also
+    // changes the actual selected state shown inside Discord's
+    // select menu. This means the user can press "Seleccionar todo"
+    // and then manually deselect one or more resources.
+
+    const buildRows = () => {
+
+        const rows =
+            chunks.flatMap(
+                (chunk, index) => {
+
+                    const menu =
+                        new StringSelectMenuBuilder()
+                            .setCustomId(
+                                menuCustomIds[index]
+                            )
+                            .setPlaceholder(
+                                index === 0
+                                    ? 'Select Items / resources'
+                                    : 'Select Wool, Sky and Crosshair'
+                            )
+                            .setMinValues(0)
+                            .setMaxValues(
+                                chunk.length
+                            )
+                            .addOptions(
+                                chunk.map(
+                                    option => {
+
+                                        const builderOption = {
+                                            label:
+                                                option.label
+                                                    .slice(
+                                                        0,
+                                                        100
+                                                    ),
+
+                                            value:
+                                                option.value,
+
+                                            description:
+                                                option.description
+                                                    .slice(
+                                                        0,
+                                                        100
+                                                    ),
+
+                                            // This is what makes the
+                                            // selection visible in the
+                                            // actual Discord select menu.
+                                            default:
+                                                selected.has(
+                                                    option.value
+                                                )
+                                        };
+
+                                        if (
+                                            option.emoji
+                                        ) {
+
+                                            builderOption.emoji =
+                                                option.emoji;
+                                        }
+
+                                        return builderOption;
+                                    }
+                                )
+                            );
+
+                    const selectAllButton =
+                        new ButtonBuilder()
+                            .setCustomId(
+                                selectAllCustomIds[index]
+                            )
+                            .setLabel(
+                                `Select all ${index + 1}`
+                            )
+                            .setStyle(
+                                ButtonStyle.Secondary
+                            );
+
+                    return [
+                        new ActionRowBuilder()
+                            .addComponents(
+                                menu
+                            ),
+                        new ActionRowBuilder()
+                            .addComponents(
+                                selectAllButton
+                            )
+                    ];
+                }
+            );
+
+
+        rows.push(
+            new ActionRowBuilder()
+                .addComponents(
+                    new ButtonBuilder()
+                        .setCustomId(
+                            continueCustomId
+                        )
+                        .setLabel(
+                            'Continue'
+                        )
+                        .setStyle(
+                            ButtonStyle.Success
+                        ),
+
+                    new ButtonBuilder()
+                        .setCustomId(
+                            `${customPrefix}_cancel`
+                        )
+                        .setLabel(
+                            'Cancel'
+                        )
+                        .setStyle(
+                            ButtonStyle.Danger
+                        )
+                )
+        );
+
+
+        return rows;
+    };
+
+
+    const renderSelector =
+        async () => {
+
+            await safeEditReply(
+                interaction,
+                {
+                    content:
+                        `## 📦 Select the resources twin\n\n` +
+                        `Choose **one or several resources** that you want to convert\n\n` +
+                        `Only the selected resources will be processed\n` +
+                        `If you select **Sky**, you'll then be able to choose which sky to use\n\n` +
+                        `When you are done, press **Continue**\n\n` +
+                        `You have **5 minutes** to choose`,
+
+                    components:
+                        buildRows()
+                }
+            );
+        };
+
+
+    await renderSelector();
+
+
+    const replyMessage =
+        await interaction.fetchReply();
+
+
+    return new Promise(
+        async (resolve, reject) => {
+
+            let finished = false;
+
+
+            const finish =
+                async callback => {
+
+                    if (
+                        finished
+                    ) {
+                        return;
+                    }
+
+                    finished = true;
+
+                    try {
+
+                        await callback();
+
+                    } catch (error) {
+
+                        console.error(
+                            '[PORTPACK RESOURCES] Finish:',
+                            error.message
+                        );
+                    }
+                };
+
+
+            const collector =
+                replyMessage.createMessageComponentCollector({
+
+                    time:
+                        300000,
+
+                    filter:
+                        component =>
+                            (
+                                menuCustomIds.includes(
+                                    component.customId
+                                ) ||
+                                selectAllCustomIds.includes(
+                                    component.customId
+                                ) ||
+                                component.customId ===
+                                    continueCustomId ||
+                                component.customId ===
+                                    `${customPrefix}_cancel`
+                            ) &&
+                            component.user.id ===
+                                interaction.user.id
+
+                });
+
+
+            collector.on(
+                'collect',
+                async component => {
+
+                    if (
+                        selectAllCustomIds.includes(
+                            component.customId
+                        )
+                    ) {
+
+                        const menuIndex =
+                            selectAllCustomIds.indexOf(
+                                component.customId
+                            );
+
+                        const chunk =
+                            chunks[menuIndex] || [];
+
+                        for (const option of chunk) {
+                            selected.add(option.value);
+                        }
+
+                        try {
+                            await component.deferUpdate();
+                        } catch (error) {
+                            console.warn(
+                                '[PORTPACK RESOURCES] select-all deferUpdate:',
+                                error.message
+                            );
+                        }
+
+                        // Re-render the menus so every selected option
+                        // is visibly checked/selected in Discord.
+                        await renderSelector();
+
+                        return;
+                    }
+
+                    if (
+                        menuCustomIds.includes(
+                            component.customId
+                        )
+                    ) {
+
+                        try {
+
+                            await component.deferUpdate();
+
+                        } catch (error) {
+
+                            console.warn(
+                                '[PORTPACK RESOURCES] deferUpdate:',
+                                error.message
+                            );
+                        }
+
+
+                        // Only replace the selections belonging to this
+                        // menu. The other menu keeps its current state.
+                        const menuIndex =
+                            menuCustomIds.indexOf(
+                                component.customId
+                            );
+
+                        const chunk =
+                            chunks[
+                                menuIndex
+                            ] || [];
+
+
+                        for (
+                            const option of chunk
+                        ) {
+
+                            selected.delete(
+                                option.value
+                            );
+                        }
+
+
+                        for (
+                            const value of (
+                                component.values ||
+                                []
+                            )
+                        ) {
+
+                            selected.add(
+                                value
+                            );
+                        }
+
+
+                        // Re-render immediately so the menu reflects
+                        // exactly what the user selected/deselected.
+                        await renderSelector();
+
+                        return;
+                    }
+
+
+                    if (
+                        component.customId ===
+                        `${customPrefix}_cancel`
+                    ) {
+
+                        await finish(
+                            async () => {
+
+                                collector.stop(
+                                    'cancelled'
+                                );
+
+                                try {
+
+                                    await component.deferUpdate();
+
+                                } catch (error) {}
+
+                                await safeEditReply(
+                                    interaction,
+                                    {
+                                        content:
+                                            `## ❌ PortPack canceled\n\n` +
+                                            `No appeal was processed`,
+
+                                        components: []
+                                    }
+                                );
+
+                                reject(
+                                    new Error(
+                                        'Resource selection canceled'
+                                    )
+                                );
+                            }
+                        );
+
+                        return;
+                    }
+
+
+                    if (
+                        component.customId ===
+                        continueCustomId
+                    ) {
+
+                        if (
+                            selected.size === 0
+                        ) {
+
+                            try {
+
+                                await component.reply({
+                                    content:
+                                        'Select at least one resource before continuing',
+                                    ephemeral: true
+                                });
+
+                            } catch (error) {}
+
+                            return;
+                        }
+
+
+                        await finish(
+                            async () => {
+
+                                collector.stop(
+                                    'selected'
+                                );
+
+                                try {
+
+                                    await component.deferUpdate();
+
+                                } catch (error) {}
+
+
+                                const selectedArray =
+                                    Array.from(
+                                        selected
+                                    );
+
+
+                                const selectedLabels =
+                                    selectedArray
+                                        .map(
+                                            value =>
+                                                getSelectedResourceLabel(
+                                                    value
+                                                )
+                                        );
+
+
+                                await safeEditReply(
+                                    interaction,
+                                    {
+                                        content:
+                                            `## Selected resources\n\n` +
+                                            selectedLabels
+                                                .map(
+                                                    label =>
+                                                        `• ${label}`
+                                                )
+                                                .join('\n') +
+                                            `\n\nPreparing PortPack...`,
+
+                                        components: []
+                                    }
+                                );
+
+
+                                resolve(
+                                    selectedArray
+                                );
+                            }
+                        );
+                    }
+                }
+            );
+
+
+            collector.on(
+                'end',
+                async (
+                    collected,
+                    reason
+                ) => {
+
+                    if (
+                        finished
+                    ) {
+                        return;
+                    }
+
+
+                    await finish(
+                        async () => {
+
+                            if (
+                                reason ===
+                                'selected'
+                            ) {
+                                return;
+                            }
+
+
+                            await safeEditReply(
+                                interaction,
+                                {
+                                    content:
+                                        `## Selection canceled\n\n` +
+                                        `The selection wasnt finished within the time limit`,
+
+                                    components: []
+                                }
+                            );
+
+
+                            reject(
+                                new Error(
+                                    'Time ran out to select resources'
+                                )
+                            );
+                        }
+                    );
+                }
+            );
+        }
+    );
+}
+
+
+// ============================================================
+// RESOURCE LABELS
+// ============================================================
+
+function getResourceLabel(
+    fileName
+) {
+
+    const labels = {
+
+        'apple_golden.png':
+            'Golden Apple',
+
+        'bow_pulling_0.png':
+            'Bow Pulling 0',
+
+        'bow_pulling_1.png':
+            'Bow Pulling 1',
+
+        'bow_pulling_2.png':
+            'Bow Pulling 2',
+
+        'bow_standby.png':
+            'Bow Standby',
+
+        'diamond.png':
+            'Diamond',
+
+        'diamond_sword.png':
+            'Diamond Sword',
+
+        'diamond_pickaxe.png':
+            'Diamond Pickaxe',
+
+        'diamond_axe.png':
+            'Diamond Axe',
+
+        'emerald.png':
+            'Emerald',
+
+        'ender_pearl.png':
+            'Ender Pearl',
+
+        'gold_sword.png':
+            'Gold Sword',
+
+        'gold_pickaxe.png':
+            'Gold Pickaxe',
+
+        'gold_axe.png':
+            'Gold Axe',
+
+        'iron_ingot.png':
+            'Iron Ingot',
+
+        'iron_sword.png':
+            'Iron Sword',
+
+        'iron_pickaxe.png':
+            'Iron Pickaxe',
+
+        'iron_axe.png':
+            'Iron Axe',
+
+        'wood_pickaxe.png':
+            'Wood Pickaxe',
+
+        'wood_sword.png':
+            'Wood Sword',
+
+        'wood_axe.png':
+            'Wood Axe',
+
+        'shears.png':
+            'Shears',
+
+        'potion_bottle_empty.png':
+            'Potion Bottle',
+
+        'fireball.png':
+            'Fireball',
+
+        'wool_colored_green.png':
+            'Wool Green',
+
+        'wool_colored_blue.png':
+            'Wool Blue',
+
+        'wool_colored_orange.png':
+            'Wool Orange',
+
+        'wool_colored_gray.png':
+            'Wool Gray',
+
+        'wool_colored_cyan.png':
+            'Wool Cyan',
+
+        'wool_colored_yellow.png':
+            'Wool Yellow',
+
+        'wool_colored_purple.png':
+            'Wool Purple',
+
+        'wool_colored_red.png':
+            'Wool Red'
+
+    };
+
+
+    return labels[
+        fileName
+    ] ||
+        fileName.replace(
+            /\.png$/i,
+            ''
+        );
+}
+
+
+function getSelectedResourceLabel(
+    value
+) {
+
+    if (
+        value === 'sky'
+    ) {
+
+        return 'Sky';
+    }
+
+    if (
+        value === 'crosshair'
+    ) {
+
+        return 'Crosshair';
+    }
+
+    const separator =
+        value.indexOf(':');
+
+    if (
+        separator === -1
+    ) {
+
+        return value;
+    }
+
+    const type =
+        value.slice(
+            0,
+            separator
+        );
+
+    const fileName =
+        value.slice(
+            separator + 1
+        );
+
+
+    if (
+        type === 'wool'
+    ) {
+
+        return `${getResourceLabel(fileName)}`;
+    }
+
+
+    return `${getResourceLabel(fileName)}`;
+}
+
+
+// ============================================================
+// ATTACHMENT
+// ============================================================
+
+async function processPack(
+    interaction,
+    attachment,
+    selectedResources
+) {
+
+    if (!attachment) {
+
+        throw new Error(
+            'No Resource Pack was provided'
+        );
+    }
+
+    const fileName =
+        String(
+            attachment.name || ''
+        ).toLowerCase();
+
+    if (
+        !fileName.endsWith('.zip')
+    ) {
+
+        throw new Error(
+            'The file must be a **.zip** Resource Pack lol'
+        );
+    }
+
+    await processPackFromDownload(
+        interaction,
+        attachment.url,
+        attachment.name || 'unnamepack.zip',
+        selectedResources
+    );
+}
+
+
+// ============================================================
+// MEDIAFIRE
+// ============================================================
+
+async function processPackFromUrl(
+    interaction,
+    mediafireUrl,
+    selectedResources
+) {
+
+    await updateProgress(
+        interaction,
+        1,
+        'Analyzing MediaFire link...'
+    );
+
+    const directUrl =
+        await resolveMediaFireUrl(
+            mediafireUrl
+        );
+
+    console.log(
+        `[PORTPACK] MediaFire direct URL: ${directUrl}`
+    );
+
+    await processPackFromDownload(
+        interaction,
+        directUrl,
+        'mediafire_resourcepack.zip',
+        selectedResources
+    );
+}
+
+
+// ============================================================
+// RESOLVE MEDIAFIRE
+// ============================================================
+
+async function resolveMediaFireUrl(
+    url
+) {
+
+    if (
+        /\.(zip)(\?|$)/i.test(url) ||
+        /download\d*\.mediafire\.com/i.test(url)
+    ) {
+
+        return url;
+    }
+
+    const response =
+        await axios.get(
+            url,
+            {
+                timeout: 20000,
+                maxRedirects: 10,
+                responseType: 'text',
+                headers: {
+                    'User-Agent':
+                        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/154 Safari/537.36'
+                }
+            }
+        );
+
+    const html =
+        String(
+            response.data || ''
+        );
+
+    const patterns = [
+
+        /download_link\s*=\s*["']([^"']+)["']/i,
+
+        /"downloadUrl"\s*:\s*"([^"]+)"/i,
+
+        /"download_link"\s*:\s*"([^"]+)"/i,
+
+        /href=["'](https?:\/\/download[^"']+)["']/i,
+
+        /href=["'](https?:\/\/[^"']*mediafire[^"']*download[^"']*)["']/i,
+
+        /(https:\/\/download\d*\.mediafire\.com\/[^"'\\\s<>]+)/i
+
+    ];
+
+    for (
+        const regex of patterns
+    ) {
+
+        const match =
+            html.match(
+                regex
+            );
+
+        if (
+            match &&
+            match[1]
+        ) {
+
+            return decodeHtmlEntities(
+                match[1]
+            )
+                .replace(
+                    /\\u0026/g,
+                    '&'
+                )
+                .replace(
+                    /\\\//g,
+                    '/'
+                );
+        }
+    }
+
+    const generic =
+        html.match(
+            /https?:\\?\/\\?\/download\d*\.mediafire\.com\/[^"'\\\s<>]+/i
+        );
+
+    if (
+        generic &&
+        generic[0]
+    ) {
+
+        return decodeHtmlEntities(
+            generic[0]
+        )
+            .replace(
+                /\\\//g,
+                '/'
+            );
+    }
+
+    throw new Error(
+        'I couldnt get the direct download link from MediaFire'
+    );
+}
+
+
+// ============================================================
+// MAIN PROCESS
+// ============================================================
+
+async function processPackFromDownload(
+    interaction,
+    downloadUrl,
+    displayName,
+    selectedResources
+) {
+
+    const selectedSet =
+        new Set(
+            selectedResources || []
+        );
+
+
+    const selectedItemImages =
+        REQUIRED_IMAGES.filter(
+            imageName =>
+                selectedSet.has(
+                    `item:${imageName}`
+                )
+        );
+
+
+    const selectedWoolImages =
+        WOOL_IMAGES.filter(
+            woolName =>
+                selectedSet.has(
+                    `wool:${woolName}`
+                )
+        );
+
+
+    const skySelected =
+        selectedSet.has(
+            'sky'
+        );
+
+
+    const crosshairSelected =
+        selectedSet.has(
+            'crosshair'
+        );
+
+
+    console.log(
+        '[PORTPACK] Selected resources:',
+        Array.from(
+            selectedSet
+        )
+    );
+
+
+    const tempRoot =
+        path.join(
+            __dirname,
+            '..',
+            'temp'
+        );
+
+    fs.mkdirSync(
+        tempRoot,
+        {
+            recursive: true
+        }
+    );
+
+    const jobId =
+        `portpack_${Date.now()}_${Math.random()
+            .toString(36)
+            .slice(2, 8)}`;
+
+    const tempDir =
+        path.join(
+            tempRoot,
+            jobId
+        );
+
+    fs.mkdirSync(
+        tempDir,
+        {
+            recursive: true
+        }
+    );
+
+    const zipPath =
+        path.join(
+            tempDir,
+            'unnamepack.zip'
+        );
+
+    try {
+
+        await updateProgress(
+            interaction,
+            3,
+            `Downloading ${displayName}...`
+        );
+
+        const response =
+            await retryOperation(
+                async () => {
+
+                    return axios.get(
+                        downloadUrl,
+                        {
+                            responseType:
+                                'arraybuffer',
+
+                            timeout:
+                                120000,
+
+                            maxContentLength:
+                                150 * 1024 * 1024,
+
+                            maxBodyLength:
+                                150 * 1024 * 1024,
+
+                            headers: {
+                                'User-Agent':
+                                    'Mozilla/5.0'
+                            }
+                        }
+                    );
+                },
+                'Resource Pack download'
+            );
+
+        fs.writeFileSync(
+            zipPath,
+            Buffer.from(
+                response.data
+            )
+        );
+
+
+        // ====================================================
+        // ZIP
+        // ====================================================
+
+        await updateProgress(
+            interaction,
+            8,
+            'Analyzing Resource Pack...'
+        );
+
+        const directory =
+            await unzipper.Open.file(
+                zipPath
+            );
+
+        // ====================================================
+        // PACK HISTORY IMAGE
+        // ====================================================
+        // pack.png must be at the ZIP root, next to assets/.
+        // It is used only for the #📋・pack-history forum post.
+        const packImageEntry =
+            directory.files.find(
+                file =>
+                    normalizeZipPath(file.path).toLowerCase() === 'pack.png'
+            );
+
+        const packImagePath =
+            path.join(
+                tempDir,
+                'pack.png'
+            );
+
+        if (packImageEntry) {
+            fs.writeFileSync(
+                packImagePath,
+                await packImageEntry.buffer()
+            );
+
+            console.log(
+                '[PACK-HISTORY] pack.png found at ZIP root.'
+            );
+        } else {
+            console.log(
+                '[PACK-HISTORY] pack.png not found at ZIP root. History post will be skipped.'
+            );
+        }
+
+        const filesByName =
+            new Map();
+
+        for (
+            const file of directory.files
+        ) {
+
+            if (
+                !file ||
+                !file.path
+            ) {
+                continue;
+            }
+
+            const normalized =
+                normalizeZipPath(
+                    file.path
+                );
+
+            if (
+                normalized.endsWith('/')
+            ) {
+                continue;
+            }
+
+            filesByName.set(
+                normalized.toLowerCase(),
+                file
+            );
+        }
+
+
+        // ====================================================
+        // SELECTED ITEMS
+        // ====================================================
+
+        const foundFiles = {};
+        const missingImages = [];
+
+        for (
+            const imageName of selectedItemImages
+        ) {
+
+            const wantedPath =
+                `${ITEMS_PATH}/${imageName}`
+                    .toLowerCase();
+
+            const file =
+                filesByName.get(
+                    wantedPath
+                );
+
+            if (!file) {
+
+                missingImages.push(
+                    imageName
+                );
+
+            } else {
+
+                foundFiles[
+                    imageName
+                ] = file;
+            }
+        }
+
+
+        if (
+            missingImages.length
+        ) {
+
+            console.log(
+                '[PORTPACK] Selected item files missing and skipped:',
+                missingImages
+            );
+        }
+
+
+        const availableItemImages =
+            selectedItemImages.filter(
+                imageName =>
+                    Boolean(
+                        foundFiles[
+                            imageName
+                        ]
+                    )
+            );
+
+
+        // ====================================================
+        // WOOL
+        // ====================================================
+
+        const foundWoolFiles = {};
+        const missingWool = [];
+
+        for (
+            const woolName of selectedWoolImages
+        ) {
+
+            const wantedPath =
+                `${WOOL_PATH}/${woolName}`
+                    .toLowerCase();
+
+            const file =
+                filesByName.get(
+                    wantedPath
+                );
+
+            if (file) {
+
+                foundWoolFiles[
+                    woolName
+                ] = file;
+
+            } else {
+
+                missingWool.push(
+                    woolName
+                );
+            }
+        }
+
+
+        if (
+            missingWool.length
+        ) {
+
+            console.log(
+                '[PORTPACK] Selected wool files missing and skipped:',
+                missingWool
+            );
+        }
+
+
+        const foundWoolNames =
+            Object.keys(
+                foundWoolFiles
+            );
+
+
+        // ====================================================
+        // SKY
+        // ====================================================
+
+        const foundSkyFiles = {};
+
+        if (
+            skySelected
+        ) {
 
             for (
-                const imageName of REQUIRED_IMAGES
+                const skyName of SKY_SOURCES
             ) {
 
                 const wantedPath =
-                    `${ITEMS_PATH}/${imageName}`
+                    `${SKY_PATH}/${skyName}`
                         .toLowerCase();
-
 
                 const file =
                     filesByName.get(
                         wantedPath
                     );
 
+                if (file) {
 
-                if (
-                    !file
-                ) {
-
-                    missingImages.push(
-                        imageName
-                    );
-
-                    continue;
-
+                    foundSkyFiles[
+                        skyName
+                    ] = file;
                 }
-
-
-                foundFiles[
-                    imageName
-                ] = file;
-
             }
+        }
 
 
-            // =================================================
-            // VALIDAR
-            // =================================================
-
-            if (
-                missingImages.length > 0
-            ) {
-
-                throw new Error(
-
-                    `El Resource Pack no contiene todas las ` +
-                    `texturas necesarias.\n\n` +
-
-                    `❌ Faltan:\n` +
-
-                    missingImages
-                        .map(
-                            name =>
-                                `• ${name}`
-                        )
-                        .join('\n') +
-
-                    `\n\nRuta esperada:\n` +
-
-                    `assets/minecraft/textures/items/`
-
-                );
-
-            }
-
-
-            console.log(
-                `[PORTPACK] All ${REQUIRED_IMAGES.length} required images found.`
+        const foundSkyNames =
+            Object.keys(
+                foundSkyFiles
             );
 
+
+        // ====================================================
+        // CROSSHAIR
+        // ====================================================
+
+        let crosshairFile =
+            null;
+
+        if (
+            crosshairSelected
+        ) {
+
+            crosshairFile =
+                filesByName.get(
+                    GUI_ICONS_PATH.toLowerCase()
+                );
+        }
+
+
+        console.log(
+            `[PORTPACK] Crosshair icons.png: ${
+                crosshairFile
+                    ? 'ENCONTRADO'
+                    : crosshairSelected
+                        ? 'NO ENCONTRADO - SE OMITIRÁ'
+                        : 'NO SELECCIONADO'
+            }`
+        );
+
+
+        // ====================================================
+        // SKY SELECT
+        // ====================================================
+
+        let selectedSkyName = null;
+
+        if (
+            skySelected &&
+            foundSkyNames.length === 1
+        ) {
+
+            selectedSkyName =
+                foundSkyNames[0];
+
+            await updateProgress(
+                interaction,
+                9,
+                `Sky automatically detected: ${selectedSkyName}`
+            );
+
+        } else if (
+            skySelected &&
+            foundSkyNames.length > 1
+        ) {
+
+            selectedSkyName =
+                await selectSky(
+                    interaction,
+                    foundSkyNames,
+                    tempDir,
+                    foundSkyFiles
+                );
+
+            if (!selectedSkyName) {
+
+                throw new Error(
+                    'No sky was selected'
+                );
+            }
+
+            await updateProgress(
+                interaction,
+                9,
+                `Sky selected: ${selectedSkyName}`
+            );
+
+        } else if (
+            skySelected
+        ) {
+
+            await updateProgress(
+                interaction,
+                9,
+                'Sky selected but no compatible file was found. Continuing...'
+            );
+        }
+
+
+        // ====================================================
+        // EXTRACT ITEMS
+        // ====================================================
+
+        const imagesDir =
+            path.join(
+                tempDir,
+                'images'
+            );
+
+        fs.mkdirSync(
+            imagesDir,
+            {
+                recursive: true
+            }
+        );
+
+
+        if (
+            availableItemImages.length > 0
+        ) {
 
             await updateProgress(
                 interaction,
                 10,
-                `Encontradas las ${REQUIRED_IMAGES.length} texturas necesarias.`
+                `Extracting ${availableItemImages.length} selected textures...`
             );
 
-
-            // =================================================
-            // CARPETA IMÁGENES
-            // =================================================
-
-            const imagesDir =
-                path.join(
-                    tempDir,
-                    'images'
-                );
-
-
-            fs.mkdirSync(
-                imagesDir,
-                {
-                    recursive: true
-                }
-            );
-
-
-            // =================================================
-            // EXTRAER
-            // =================================================
 
             await Promise.all(
-
-                REQUIRED_IMAGES.map(
+                availableItemImages.map(
                     async imageName => {
 
-                        const file =
-                            foundFiles[
+                        const buffer =
+                            await foundFiles[
                                 imageName
-                            ];
+                            ].buffer();
 
-
-                        const imageBuffer =
-                            await retryOperation(
-
-                                async () => {
-
-                                    return file.buffer();
-
-                                },
-
-                                `extracción de ${imageName}`,
-
-                                MAX_RETRIES
-
-                            );
-
-
-                        const outputImagePath =
+                        fs.writeFileSync(
                             path.join(
                                 imagesDir,
                                 imageName
-                            );
-
-
-                        fs.writeFileSync(
-                            outputImagePath,
-                            imageBuffer
+                            ),
+                            buffer
                         );
-
-
-                        console.log(
-                            `[PORTPACK] Extracted: ${imageName}`
-                        );
-
                     }
                 )
-
             );
+
+        } else {
+
+            await updateProgress(
+                interaction,
+                10,
+                'There are no item textures available to process'
+            );
+        }
+
+
+        // ====================================================
+        // PREPARE WOOL FILES FOR RESOLUTION CHECK
+        // ====================================================
+
+        // Wool textures are stored in the ZIP as buffers. Write the
+        // selected ones to temp first so the resolution checker can
+        // inspect them before the normal Wool processing starts.
+        // The processing stage below will reuse these files, including
+        // any cropped version created by the resolution checker.
+        for (const woolName of foundWoolNames) {
+
+            const woolFile =
+                foundWoolFiles[woolName];
+
+            const woolInputPath =
+                path.join(
+                    tempDir,
+                    `wool_${sanitizeFileName(woolName)}`
+                );
+
+            if (!fs.existsSync(woolInputPath)) {
+
+                const buffer =
+                    await woolFile.buffer();
+
+                fs.writeFileSync(
+                    woolInputPath,
+                    buffer
+                );
+            }
+        }
+
+
+        // ====================================================
+        // RESOLUTION CHECK / OPTIONAL CROPPING
+        // ====================================================
+
+        // Check every selected Item/Wool texture before starting any
+        // Roblox upload or Blender work. If several textures are wrong
+        // at the same time, they are all shown in ONE confirmation and
+        // cropped together when the user accepts.
+        const squareTextureCandidates = [];
+
+        for (const imageName of availableItemImages) {
+
+            squareTextureCandidates.push({
+                imageName,
+                imagePath: path.join(
+                    imagesDir,
+                    imageName
+                ),
+                type: 'item'
+            });
+        }
+
+        for (const woolName of foundWoolNames) {
+
+            squareTextureCandidates.push({
+                imageName: woolName,
+                imagePath: path.join(
+                    tempDir,
+                    `wool_${sanitizeFileName(
+                        woolName
+                    )}`
+                ),
+                type: 'wool'
+            });
+        }
+
+
+        const invalidSquareTextures =
+            await findInvalidSquareTextures(
+                squareTextureCandidates
+            );
+
+
+        if (invalidSquareTextures.length > 0) {
+
+            const shouldCrop =
+                await confirmCropInvalidTextures(
+                    interaction,
+                    invalidSquareTextures
+                );
+
+            if (!shouldCrop) {
+
+                throw new Error(
+                    'The processing was canceled because there are textures with incompatible resolution.'
+                );
+            }
 
 
             await updateProgress(
                 interaction,
                 12,
-                'Texturas extraídas. Iniciando procesamiento...'
+                `✂️ Trimming ${invalidSquareTextures.length} texture(s) to their square resolution...`
             );
 
 
-            // =================================================
-            // ASSETS GENERADOS
-            // =================================================
+            await Promise.all(
+                invalidSquareTextures.map(
+                    texture =>
+                        cropTextureToSquare(
+                            texture.imagePath,
+                            texture.targetSize
+                        )
+                )
+            );
 
-            const generatedAssets = {};
-
-            let completed =
-                0;
-
-
-            const total =
-                REQUIRED_IMAGES.length;
-
-
-            const progressLock = {
-                promise: Promise.resolve()
-            };
+            console.log(
+                '[PORTPACK] Invalid textures cropped:',
+                invalidSquareTextures.map(
+                    texture =>
+                        `${texture.imageName}: ${texture.width}x${texture.height} -> ${texture.targetSize}x${texture.targetSize}`
+                )
+            );
+        }
 
 
-            // =================================================
-            // PROCESAR UNA TEXTURA
-            // =================================================
+        // ====================================================
+        // PREPARE
+        // ====================================================
 
-            const processOne =
+        const generatedAssets = {};
+
+        const meshRequired =
+            availableItemImages.filter(
+                imageName =>
+                    IMAGE_MAPPINGS[
+                        imageName
+                    ]?.mesh?.length > 0
+            );
+
+
+        let completed = 0;
+
+
+        await updateProgress(
+            interaction,
+            15,
+            availableItemImages.length > 0
+                ? 'Processing textures, Roblox, and Blender in parallel...'
+                : 'No items selected available. Continuing...'
+        );
+
+
+        // ====================================================
+        // ITEMS
+        // ====================================================
+
+        if (
+            availableItemImages.length > 0
+        ) {
+
+            await runWithConcurrency(
+                availableItemImages,
+                CONCURRENCY,
                 async imageName => {
-
-                    console.log();
-                    console.log(
-                        `[PORTPACK] ============================================`
-                    );
-                    console.log(
-                        `[PORTPACK] ${completed + 1}/${total}: ${imageName}`
-                    );
-                    console.log(
-                        `[PORTPACK] ============================================`
-                    );
-
 
                     const imagePath =
                         path.join(
@@ -1100,20 +2505,51 @@ module.exports = {
                             imageName
                         );
 
+                    const baseName =
+                        path.basename(
+                            imageName,
+                            '.png'
+                        );
 
-                    // -----------------------------------------
-                    // METADATA
-                    // -----------------------------------------
+                    const texturePath =
+                        path.join(
+                            tempDir,
+                            `texture_${sanitizeFileName(
+                                imageName
+                            )}`
+                        );
 
-                    const metadata =
-                        await sharp(
+                    const mapping =
+                        IMAGE_MAPPINGS[
+                            imageName
+                        ];
+
+                    const needsMesh =
+                        mapping?.mesh?.length > 0;
+
+
+                    const metadataPromise =
+                        sharp(
                             imagePath
                         ).metadata();
+
+                    const texturePromise =
+                        createTexture(
+                            imagePath,
+                            texturePath
+                        );
+
+                    const [
+                        metadata
+                    ] =
+                        await Promise.all([
+                            metadataPromise,
+                            texturePromise
+                        ]);
 
 
                     const width =
                         metadata.width;
-
 
                     const height =
                         metadata.height;
@@ -1127,7 +2563,6 @@ module.exports = {
                         throw new Error(
                             `No se pudo detectar la resolución de ${imageName}.`
                         );
-
                     }
 
 
@@ -1136,15 +2571,8 @@ module.exports = {
                     ) {
 
                         throw new Error(
-
-                            `${imageName} no es cuadrada.\n` +
-
-                            `Resolución encontrada: ` +
-
-                            `${width}x${height}`
-
+                            `${imageName} no es cuadrada (${width}x${height}).`
                         );
-
                     }
 
 
@@ -1155,588 +2583,1672 @@ module.exports = {
                     ) {
 
                         throw new Error(
-
-                            `${imageName} tiene una resolución no válida.\n\n` +
-
-                            `Resoluciones permitidas: ` +
-
-                            `${VALID_SIZES
+                            `${imageName} tiene resolución ${width}x${height}.\n` +
+                            `Permitidas: ${VALID_SIZES
                                 .map(
-                                    size =>
-                                        `${size}x${size}`
+                                    x => `${x}x${x}`
                                 )
-                                .join(', ')}\n\n` +
-
-                            `Resolución encontrada: ` +
-
-                            `${width}x${height}`
-
+                                .join(', ')}`
                         );
-
                     }
 
 
-                    // -----------------------------------------
-                    // TEXTURA 1024
-                    // -----------------------------------------
-
-                    const texturePath =
-                        path.join(
-
-                            tempDir,
-
-                            `texture_${sanitizeFileName(
-                                imageName
-                            )}`
-
+                    const textureUploadPromise =
+                        uploadAsset(
+                            texturePath,
+                            'Image',
+                            `PortPack_${baseName}_Texture_${Date.now()}`
                         );
 
 
-                    await retryOperation(
+                    let blenderPromise = null;
 
-                        async () => {
-
-                            await sharp(
-                                imagePath
-                            )
-
-                                .ensureAlpha()
-
-                                .resize(
-
-                                    FINAL_SIZE,
-
-                                    FINAL_SIZE,
-
-                                    {
-
-                                        kernel:
-                                            sharp.kernel.nearest
-
-                                    }
-
-                                )
-
-                                .png()
-
-                                .toFile(
-                                    texturePath
-                                );
-
-                        },
-
-                        `procesamiento de textura ${imageName}`,
-
-                        MAX_RETRIES
-
-                    );
-
-
-                    // -----------------------------------------
-                    // FBX
-                    // -----------------------------------------
-
-                    const baseName =
-                        path.basename(
-                            imageName,
-                            '.png'
-                        );
-
-
-                    const fbxPath =
-                        path.join(
-
-                            tempDir,
-
-                            `${baseName}.fbx`
-
-                        );
-
-
-                    const blendPath =
-                        path.join(
-
-                            tempDir,
-
-                            `${baseName}.blend`
-
-                        );
-
-
-                    // -----------------------------------------
-                    // BLENDER
-                    // -----------------------------------------
-
-                    await retryOperation(
-
-                        async () => {
-
-                            try {
-
-                                if (
-                                    fs.existsSync(
-                                        fbxPath
-                                    )
-                                ) {
-
-                                    fs.rmSync(
-                                        fbxPath,
-                                        {
-                                            force:
-                                                true
-                                        }
-                                    );
-
-                                }
-
-                            } catch {}
-
-
-                            await generateMeshWithBlender(
-
-                                texturePath,
-
-                                imagePath,
-
-                                fbxPath,
-
-                                blendPath,
-
-                                width,
-
-                                ROTATION_X,
-
-                                ROTATION_Y,
-
-                                ROTATION_Z
-
-                            );
-
-                        },
-
-                        `generación Blender de ${imageName}`,
-
-                        MAX_RETRIES
-
-                    );
+                    let fbxPath = null;
+                    let blendPath = null;
 
 
                     if (
-                        !fs.existsSync(
-                            fbxPath
-                        )
+                        needsMesh
                     ) {
 
-                        throw new Error(
+                        fbxPath =
+                            path.join(
+                                tempDir,
+                                `${baseName}.fbx`
+                            );
 
-                            `Blender no creó el FBX de ${imageName}.`
+                        blendPath =
+                            path.join(
+                                tempDir,
+                                `${baseName}.blend`
+                            );
 
-                        );
 
+                        blenderPromise =
+                            generateMeshWithBlender(
+                                texturePath,
+                                imagePath,
+                                fbxPath,
+                                blendPath,
+                                width,
+                                ROTATION_X,
+                                ROTATION_Y,
+                                ROTATION_Z
+                            );
                     }
 
 
-                    // -----------------------------------------
-                    // SUBIR TEXTURA
-                    // -----------------------------------------
-
                     const textureId =
-                        await uploadAsset(
-
-                            texturePath,
-
-                            'Image',
-
-                            `PortPack_${baseName}_Texture_${Date.now()}`
-
-                        );
+                        await textureUploadPromise;
 
 
-                    // -----------------------------------------
-                    // SUBIR MODELO
-                    // -----------------------------------------
-
-                    const modelId =
-                        await uploadAsset(
-
-                            fbxPath,
-
-                            'Model',
-
-                            `PortPack_${baseName}_Mesh_${Date.now()}`
-
-                        );
+                    let modelId = null;
 
 
-                    // -----------------------------------------
-                    // MESH ID
-                    // -----------------------------------------
-                    //
-                    // IMPORTANTE:
-                    //
-                    // Esta función ahora entra en una cola
-                    // global y NO puede ejecutarse junto con
-                    // otra tarea Luau.
-                    //
-                    // -----------------------------------------
+                    if (
+                        needsMesh
+                    ) {
 
-                    const meshId =
-                        await extractMeshIdWithLuau(
-                            modelId
-                        );
+                        await blenderPromise;
+
+
+                        modelId =
+                            await uploadAsset(
+                                fbxPath,
+                                'Model',
+                                `PortPack_${baseName}_Mesh_${Date.now()}`
+                            );
+                    }
 
 
                     generatedAssets[
                         imageName
                     ] = {
 
-                        meshId:
-                            String(
-                                meshId
-                            ),
-
                         textureId:
                             String(
                                 textureId
-                            )
+                            ),
 
+                        modelId:
+                            modelId
+                                ? String(
+                                    modelId
+                                )
+                                : null
                     };
 
 
                     completed++;
 
 
-                    // -----------------------------------------
-                    // PROGRESO
-                    // -----------------------------------------
-
                     const progress =
                         Math.min(
-
-                            97,
-
+                            84,
+                            15 +
                             Math.round(
-
-                                12 +
-
-                                (
-                                    completed /
-                                    total
-                                ) * 85
-
+                                completed /
+                                availableItemImages.length *
+                                69
                             )
-
                         );
 
 
-                    progressLock.promise =
-                        progressLock.promise.then(
-
-                            () =>
-                                updateProgress(
-
-                                    interaction,
-
-                                    progress,
-
-                                    `Procesadas ${completed}/${total} texturas.`
-
-                                )
-
-                        );
-
-
-                    await progressLock.promise;
-
-
-                    console.log(
-                        `[PORTPACK] COMPLETE ${imageName}`
+                    await updateProgress(
+                        interaction,
+                        progress,
+                        `Processed ${completed}/${availableItemImages.length} • ${imageName}`
                     );
+                }
+            );
+
+        }
 
 
-                    console.log(
-                        `  TextureId: ${textureId}`
-                    );
+        // ====================================================
+        // WOOL
+        // ====================================================
+
+        const woolAssets = {};
 
 
-                    console.log(
-                        `  MeshId: ${meshId}`
-                    );
+        if (
+            foundWoolNames.length > 0
+        ) {
 
-                };
-
-
-            // =================================================
-            // WORKERS
-            // =================================================
-            //
-            // Blender + uploads pueden seguir usando
-            // concurrencia.
-            //
-            // Luau está protegido por la cola global.
-            //
-            // =================================================
-
-            await runWithConcurrency(
-
-                REQUIRED_IMAGES,
-
-                CONCURRENCY,
-
-                processOne
-
+            await updateProgress(
+                interaction,
+                85,
+                `Processing ${foundWoolNames.length} selected Wool...`
             );
 
 
-            // =================================================
-            // VERIFICAR
-            // =================================================
+            let woolCompleted = 0;
+
+
+            await runWithConcurrency(
+                foundWoolNames,
+                CONCURRENCY,
+                async woolName => {
+
+                    const woolFile =
+                        foundWoolFiles[
+                            woolName
+                        ];
+
+                    const buffer =
+                        await woolFile.buffer();
+
+
+                    const inputPath =
+                        path.join(
+                            tempDir,
+                            `wool_${sanitizeFileName(
+                                woolName
+                            )}`
+                        );
+
+
+                    const outputPath =
+                        path.join(
+                            tempDir,
+                            `wool_texture_${sanitizeFileName(
+                                woolName
+                            )}`
+                        );
+
+
+                    // The file may already have been prepared and
+                    // cropped by the resolution check above. Do not
+                    // overwrite it with the original ZIP buffer.
+                    if (!fs.existsSync(inputPath)) {
+
+                        fs.writeFileSync(
+                            inputPath,
+                            buffer
+                        );
+                    }
+
+
+                    await createTexture(
+                        inputPath,
+                        outputPath
+                    );
+
+
+                    const field =
+                        WOOL_MAPPINGS[
+                            woolName
+                        ];
+
+
+                    const textureId =
+                        await uploadAsset(
+                            outputPath,
+                            'Image',
+                            `PortPack_${field}_${Date.now()}`
+                        );
+
+
+                    woolAssets[
+                        woolName
+                    ] = {
+
+                        field,
+
+                        textureId:
+                            String(
+                                textureId
+                            )
+                    };
+
+
+                    woolCompleted++;
+
+
+                    await updateProgress(
+                        interaction,
+                        85 +
+                        Math.round(
+                            woolCompleted /
+                            foundWoolNames.length *
+                            2
+                        ),
+                        `🧶 Wool ${woolCompleted}/${foundWoolNames.length} • ${woolName}`
+                    );
+                }
+            );
+        }
+
+
+        // ====================================================
+        // SKY
+        // ====================================================
+
+        const skyAssets = {};
+
+
+        if (
+            selectedSkyName
+        ) {
+
+            await updateProgress(
+                interaction,
+                88,
+                `Processing Sky • ${selectedSkyName}...`
+            );
+
+
+            const skyBuffer =
+                await foundSkyFiles[
+                    selectedSkyName
+                ].buffer();
+
+
+            const skySourcePath =
+                path.join(
+                    tempDir,
+                    `sky_source_${sanitizeFileName(
+                        selectedSkyName
+                    )}`
+                );
+
+
+            fs.writeFileSync(
+                skySourcePath,
+                skyBuffer
+            );
+
+
+            const skyMetadata =
+                await sharp(
+                    skySourcePath
+                ).metadata();
+
 
             if (
-                Object.keys(
-                    generatedAssets
-                ).length !== total
+                !skyMetadata.width ||
+                !skyMetadata.height
             ) {
 
                 throw new Error(
-
-                    `Solo se generaron ` +
-
-                    `${Object.keys(
-                        generatedAssets
-                    ).length}/${total} texturas.`
-
+                    `No se pudo detectar la resolución del sky ${selectedSkyName}.`
                 );
-
             }
 
 
-            // =================================================
-            // JSON
-            // =================================================
+            if (
+                skyMetadata.width % 3 !== 0 ||
+                skyMetadata.height % 2 !== 0
+            ) {
 
-            await updateProgress(
-
-                interaction,
-
-                98,
-
-                'Construyendo el JSON de Bridge Duels...'
-
-            );
+                throw new Error(
+                    `El sky ${selectedSkyName} no tiene una distribución 3x2 válida.\n` +
+                    `Resolución encontrada: ${skyMetadata.width}x${skyMetadata.height}`
+                );
+            }
 
 
-            const finalPack =
-                buildFinalPack(
-                    generatedAssets
+            const faceWidth =
+                Math.floor(
+                    skyMetadata.width / 3
                 );
 
 
-            const jsonString =
+            const faceHeight =
+                Math.floor(
+                    skyMetadata.height / 2
+                );
+
+
+            const skyFaces = [
+
+                {
+                    skyNumber: 1,
+                    name: 'bottom',
+                    left: 0,
+                    top: 0
+                },
+
+                {
+                    skyNumber: 2,
+                    name: 'top',
+                    left: 1,
+                    top: 0
+                },
+
+                {
+                    skyNumber: 3,
+                    name: 'left',
+                    left: 2,
+                    top: 0
+                },
+
+                {
+                    skyNumber: 4,
+                    name: 'back',
+                    left: 0,
+                    top: 1
+                },
+
+                {
+                    skyNumber: 5,
+                    name: 'right',
+                    left: 1,
+                    top: 1
+                },
+
+                {
+                    skyNumber: 6,
+                    name: 'front',
+                    left: 2,
+                    top: 1
+                }
+
+            ];
+
+
+            let skyCompleted = 0;
+
+
+            await Promise.all(
+                skyFaces.map(
+                    async face => {
+
+                        const facePath =
+                            path.join(
+                                tempDir,
+                                `sky_${face.name}.png`
+                            );
+
+
+                        const field =
+                            SKY_MAPPINGS[
+                                face.name
+                            ];
+
+
+                        await sharp(
+                            skySourcePath
+                        )
+                            .extract({
+                                left:
+                                    face.left *
+                                    faceWidth,
+
+                                top:
+                                    face.top *
+                                    faceHeight,
+
+                                width:
+                                    faceWidth,
+
+                                height:
+                                    faceHeight
+                            })
+                            .resize(
+                                FINAL_SIZE,
+                                FINAL_SIZE,
+                                {
+                                    fit:
+                                        'fill',
+
+                                    kernel:
+                                        sharp.kernel.lanczos3,
+
+                                    withoutEnlargement:
+                                        false
+                                }
+                            )
+                            .png({
+                                compressionLevel:
+                                    9,
+
+                                adaptiveFiltering:
+                                    true,
+
+                                force:
+                                    true
+                            })
+                            .toFile(
+                                facePath
+                            );
+
+
+                        const textureId =
+                            await uploadAsset(
+                                facePath,
+                                'Image',
+                                `PortPack_${field}_${Date.now()}`
+                            );
+
+
+                        skyAssets[
+                            field
+                        ] =
+                            String(
+                                textureId
+                            );
+
+
+                        skyCompleted++;
+
+
+                        await updateProgress(
+                            interaction,
+                            88 +
+                            Math.round(
+                                skyCompleted /
+                                skyFaces.length *
+                                5
+                            ),
+                            `Sky ${skyCompleted}/6 • ${field}`
+                        );
+                    }
+                )
+            );
+        }
+
+
+        // ====================================================
+        // CROSSHAIR
+        // ====================================================
+
+        let crosshairTextureId = null;
+
+
+        if (
+            crosshairSelected &&
+            crosshairFile
+        ) {
+
+            await updateProgress(
+                interaction,
+                93,
+                'Detecting Crosshair in gui/icons.png...'
+            );
+
+
+            const iconsBuffer =
+                await crosshairFile.buffer();
+
+
+            const iconsPath =
+                path.join(
+                    tempDir,
+                    'icons.png'
+                );
+
+
+            const crosshairPath =
+                path.join(
+                    tempDir,
+                    'crosshair.png'
+                );
+
+
+            fs.writeFileSync(
+                iconsPath,
+                iconsBuffer
+            );
+
+
+            const iconsMetadata =
+                await sharp(
+                    iconsPath
+                ).metadata();
+
+
+            if (
+                !iconsMetadata.width ||
+                !iconsMetadata.height
+            ) {
+
+                throw new Error(
+                    'Could not read the resolution of gui/icons.png.'
+                );
+            }
+
+
+            const crosshairCrop =
+                detectCrosshairCrop(
+                    iconsMetadata.width,
+                    iconsMetadata.height
+                );
+
+
+            console.log(
+                '[CROSSHAIR] icons.png:',
+                `${iconsMetadata.width}x${iconsMetadata.height}`
+            );
+
+
+            console.log(
+                '[CROSSHAIR] Crop:',
+                crosshairCrop
+            );
+
+
+            await sharp(
+                iconsPath
+            )
+                .extract(
+                    crosshairCrop
+                )
+                .resize(
+                    FINAL_SIZE,
+                    FINAL_SIZE,
+                    {
+                        kernel:
+                            sharp.kernel.nearest
+                    }
+                )
+                .png()
+                .toFile(
+                    crosshairPath
+                );
+
+
+            crosshairTextureId =
+                await uploadAsset(
+                    crosshairPath,
+                    'Image',
+                    `PortPack_Crosshair_${Date.now()}`
+                );
+
+
+            crosshairTextureId =
+                String(
+                    crosshairTextureId
+                );
+
+
+            console.log(
+                `[CROSSHAIR] TextureId: ${crosshairTextureId}`
+            );
+
+        } else if (
+            crosshairSelected
+        ) {
+
+            await updateProgress(
+                interaction,
+                93,
+                '🎯 Crosshair seleccionada pero gui/icons.png no existe. Continuando...'
+            );
+        }
+
+
+        // ====================================================
+        // VALIDATE
+        // ====================================================
+
+        if (
+            Object.keys(
+                generatedAssets
+            ).length !==
+            availableItemImages.length
+        ) {
+
+            throw new Error(
+                `Solo se procesaron ${Object.keys(
+                    generatedAssets
+                ).length}/${availableItemImages.length} texturas seleccionadas disponibles.`
+            );
+        }
+
+
+        // ====================================================
+        // LUAU
+        // ====================================================
+
+        const modelEntries =
+            meshRequired
+                .filter(
+                    imageName =>
+                        generatedAssets[
+                            imageName
+                        ]?.modelId
+                )
+                .map(
+                    imageName => ({
+                        imageName,
+
+                        modelId:
+                            generatedAssets[
+                                imageName
+                            ].modelId
+                    })
+                );
+
+
+        let meshIds = {};
+
+
+        if (
+            modelEntries.length > 0
+        ) {
+
+            await updateProgress(
+                interaction,
+                94,
+                `🧠 Extrayendo ${modelEntries.length} MeshId en una sola tarea Roblox...`
+            );
+
+
+            meshIds =
+                await extractAllMeshIdsWithLuau(
+                    modelEntries
+                );
+
+
+            for (
+                const entry of modelEntries
+            ) {
+
+                const meshId =
+                    meshIds[
+                        entry.imageName
+                    ];
+
+
+                if (!meshId) {
+
+                    throw new Error(
+                        `Luau no devolvió MeshId para ${entry.imageName}.`
+                    );
+                }
+
+
+                generatedAssets[
+                    entry.imageName
+                ].meshId =
+                    String(
+                        meshId
+                    );
+            }
+
+        } else {
+
+            await updateProgress(
+                interaction,
+                94,
+                '🧠 No hay Meshes seleccionados que necesiten extracción Luau.'
+            );
+        }
+
+
+        // ====================================================
+        // MAIN JSON
+        // ====================================================
+
+        await updateProgress(
+            interaction,
+            96,
+            '🧩 Construyendo JSON de Bridge Duels...'
+        );
+
+
+        const finalPack =
+            buildFinalPack(
+                generatedAssets,
+                woolAssets,
+                selectedResources
+            );
+
+
+        const jsonString =
+            JSON.stringify(
+                finalPack,
+                null,
+                4
+            );
+
+
+        // ====================================================
+        // MAIN ZSTD
+        // ====================================================
+
+        await updateProgress(
+            interaction,
+            98,
+            '🗜️ Comprimiendo JSON principal...'
+        );
+
+
+        const compressedBuffer =
+            await compress(
+                Buffer.from(
+                    jsonString,
+                    'utf8'
+                ),
+                10
+            );
+
+
+        const zbase64 =
+            compressedBuffer.toString(
+                'base64'
+            );
+
+
+        const compressedJson =
+            JSON.stringify({
+                m: null,
+                t: 'buffer',
+                zbase64
+            });
+
+
+        // ====================================================
+        // SKY JSON NORMAL — SIN COMPRESIÓN
+        // ====================================================
+
+        let skyJsonString = null;
+
+
+        if (
+            selectedSkyName &&
+            Object.keys(
+                skyAssets
+            ).length === 6
+        ) {
+
+            const skyPack = {
+
+                "SkyBack":
+                    String(
+                        skyAssets.SkyBack
+                    ),
+
+                "SkyRight":
+                    String(
+                        skyAssets.SkyRight
+                    ),
+
+                "SkyLeft":
+                    String(
+                        skyAssets.SkyLeft
+                    ),
+
+                "SkyBottom":
+                    String(
+                        skyAssets.SkyBottom
+                    ),
+
+                "SkyTop":
+                    String(
+                        skyAssets.SkyTop
+                    ),
+
+                "SkyFront":
+                    String(
+                        skyAssets.SkyFront
+                    )
+
+            };
+
+
+            skyJsonString =
                 JSON.stringify(
-                    finalPack,
+                    skyPack,
                     null,
                     4
                 );
 
 
             console.log(
-                '[PORTPACK] Final JSON built.'
+                '[PORTPACK] Sky JSON SIN compresión generado.'
             );
 
 
-            // =================================================
-            // ZSTD
-            // =================================================
-
-            await updateProgress(
-
-                interaction,
-
-                99,
-
-                'Comprimiendo JSON con Zstandard...'
-
+            console.log(
+                '[PORTPACK] Sky mapping final:',
+                skyPack
             );
+        }
 
 
-            const jsonBuffer =
-                Buffer.from(
-                    jsonString,
-                    'utf8'
+        // ====================================================
+        // DONE
+        // ====================================================
+
+        await updateProgress(
+            interaction,
+            100,
+            '✅ ¡PortPack terminado!'
+        );
+
+
+        await sendPortPackResult(
+            interaction,
+            displayName,
+            compressedJson,
+            skyJsonString,
+            selectedSkyName,
+            crosshairTextureId,
+            tempDir,
+            packImagePath
+        );
+
+
+        console.log(
+            '[PORTPACK] Completed successfully.'
+        );
+
+
+    } catch (error) {
+
+        console.error(
+            '[ERROR] /portpack:',
+            error
+        );
+
+
+        await safeEditReply(
+            interaction,
+            `❌ **Error en /portpack:**\n\n\`${String(
+                error?.message ||
+                'Ocurrió un error desconocido.'
+            ).slice(0, 1800)}\``
+        );
+
+    } finally {
+
+        try {
+
+            if (
+                fs.existsSync(
+                    tempDir
+                )
+            ) {
+
+                fs.rmSync(
+                    tempDir,
+                    {
+                        recursive: true,
+                        force: true
+                    }
                 );
-
-
-            const compressedBuffer =
-                await compress(
-
-                    jsonBuffer,
-
-                    10
-
-                );
-
-
-            const zbase64 =
-                compressedBuffer.toString(
-                    'base64'
-                );
-
-
-            const compressedObject = {
-
-                m: null,
-
-                t: "buffer",
-
-                zbase64
-
-            };
-
-
-            const compressedJson =
-                JSON.stringify(
-                    compressedObject
-                );
-
-
-            console.log();
-            console.log(
-                '[PORTPACK] ============================================'
-            );
-            console.log(
-                '[PORTPACK] ZSTD COMPLETE'
-            );
-            console.log(
-                `[PORTPACK] Original JSON: ${jsonBuffer.length} bytes`
-            );
-            console.log(
-                `[PORTPACK] Compressed: ${compressedBuffer.length} bytes`
-            );
-            console.log(
-                `[PORTPACK] Base64: ${zbase64.length} characters`
-            );
-            console.log(
-                '[PORTPACK] ============================================'
-            );
-
-
-            // =================================================
-            // FINAL
-            // =================================================
-
-            await updateProgress(
-
-                interaction,
-
-                100,
-
-                '¡PortPack terminado!'
-
-            );
-
-
-            await sendCopyableJson(
-
-                interaction,
-
-                compressedJson
-
-            );
-
-
-            console.log(
-                '[PORTPACK] Completed successfully.'
-            );
-
+            }
 
         } catch (error) {
 
-            console.error();
-            console.error(
-                '[ERROR] /portpack:'
+            console.warn(
+                '[CLEANUP] Error:',
+                error.message
             );
-            console.error(
-                error
-            );
-
-
-            await safeEditReply(
-
-                interaction,
-
-                `❌ **Error en /portpack:**\n\n` +
-
-                `\`${String(
-                    error?.message ||
-                    'Ocurrió un error desconocido.'
-                ).slice(0, 1800)}\``
-
-            );
-
-
-        } finally {
-
-            // =================================================
-            // LIMPIEZA
-            // =================================================
-
-            try {
-
-                if (
-                    fs.existsSync(
-                        tempDir
-                    )
-                ) {
-
-                    fs.rmSync(
-
-                        tempDir,
-
-                        {
-
-                            recursive:
-                                true,
-
-                            force:
-                                true
-
-                        }
-
-                    );
-
-
-                    console.log(
-                        `[CLEANUP] Deleted ${tempDir}`
-                    );
-
-                }
-
-            } catch (cleanupError) {
-
-                console.warn(
-
-                    '[CLEANUP] No se pudo eliminar temp:',
-
-                    cleanupError.message
-
-                );
-
-            }
-
         }
-
     }
-
-};
+}
 
 
 // ============================================================
-// CONSTRUIR JSON FINAL
+// CROSSHAIR DETECTION
+// ============================================================
+
+function detectCrosshairCrop(
+    width,
+    height
+) {
+
+    if (
+        width >= 16 &&
+        height >= 16
+    ) {
+
+        const scale =
+            width / 256;
+
+        const cellSize =
+            Math.max(
+                1,
+                Math.round(
+                    16 * scale
+                )
+            );
+
+        return {
+
+            left: 0,
+            top: 0,
+
+            width:
+                Math.min(
+                    cellSize,
+                    width
+                ),
+
+            height:
+                Math.min(
+                    cellSize,
+                    height
+                )
+        };
+    }
+
+
+    return {
+
+        left: 0,
+        top: 0,
+
+        width,
+        height
+    };
+}
+
+
+// ============================================================
+// SKY SELECTOR
+// ============================================================
+
+async function selectSky(
+    interaction,
+    skyNames,
+    tempDir,
+    foundSkyFiles
+) {
+
+    if (
+        !Array.isArray(skyNames) ||
+        skyNames.length === 0
+    ) {
+
+        return null;
+    }
+
+
+    if (
+        skyNames.length === 1
+    ) {
+
+        return skyNames[0];
+    }
+
+
+    const options =
+        skyNames
+            .slice(
+                0,
+                25
+            )
+            .map(
+                (name, index) => ({
+
+                    label:
+                        name
+                            .replace(
+                                '.png',
+                                ''
+                            )
+                            .slice(
+                                0,
+                                100
+                            ),
+
+                    value:
+                        name,
+
+                    description:
+                        `Sky ${index + 1} • 3x2 layout`
+
+                })
+            );
+
+
+    // ========================================================
+    // SKY PREVIEWS
+    // ========================================================
+
+    const previewFiles = [];
+    const previewEmbeds = [];
+
+    const previewNames =
+        skyNames.slice(0, 10);
+
+    for (
+        const name of previewNames
+    ) {
+
+        try {
+
+            const sourceFile =
+                foundSkyFiles?.[name];
+
+            if (!sourceFile) {
+                continue;
+            }
+
+            const previewName =
+                `sky_preview_${sanitizeFileName(name)}`;
+
+            const previewPath =
+                path.join(
+                    tempDir,
+                    previewName
+                );
+
+            const buffer =
+                await sourceFile.buffer();
+
+            await sharp(buffer)
+                .resize(1200, 800, {
+                    fit: 'inside',
+                    withoutEnlargement: true
+                })
+                .png()
+                .toFile(previewPath);
+
+            previewFiles.push(
+                new AttachmentBuilder(
+                    previewPath,
+                    {
+                        name: previewName
+                    }
+                )
+            );
+
+            previewEmbeds.push(
+                new EmbedBuilder()
+                    .setTitle(`🌌 ${name}`)
+                    .setImage(`attachment://${previewName}`)
+            );
+
+        } catch (error) {
+
+            console.warn(
+                `[PORTPACK SKY] Could not create preview for ${name}:`,
+                error.message
+            );
+        }
+    }
+
+
+    const customId =
+        `portpack_sky_select_${Date.now()}_${Math.random()
+            .toString(36)
+            .slice(2, 8)}`;
+
+
+    const menu =
+        new StringSelectMenuBuilder()
+            .setCustomId(
+                customId
+            )
+            .setPlaceholder(
+                'Select the Sky you want to use'
+            )
+            .addOptions(
+                options
+            );
+
+
+    const row =
+        new ActionRowBuilder()
+            .addComponents(
+                menu
+            );
+
+
+    await safeEditReply(
+        interaction,
+        {
+            content:
+                `## Select a Sky\n\n` +
+                `Found **${skyNames.length}** sky(s) in:\n` +
+                `\`${SKY_PATH}/\`\n\n` +
+                `Preview images are shown below. Select one from the menu.\n` +
+                `The selected Sky will automatically be split into **6 faces**, and each face will be converted to **1024×1024**.\n\n` +
+                `You have **5 minutes** to select it.`,
+
+            components: [
+                row
+            ],
+
+            files: previewFiles,
+            embeds: previewEmbeds
+        }
+    );
+
+
+    const replyMessage =
+        await interaction.fetchReply();
+
+
+    return new Promise(
+        async (resolve, reject) => {
+
+            let finished = false;
+
+
+            const finish =
+                async callback => {
+
+                    if (
+                        finished
+                    ) {
+                        return;
+                    }
+
+
+                    finished = true;
+
+
+                    try {
+
+                        await callback();
+
+                    } catch (error) {
+
+                        console.error(
+                            '[PORTPACK SKY] Error finalizando selector:',
+                            error.message
+                        );
+                    }
+                };
+
+
+            const collector =
+                replyMessage.createMessageComponentCollector({
+
+                    componentType: 3,
+
+                    time: 300000,
+
+                    filter:
+                        component =>
+                            component.customId ===
+                                customId &&
+                            component.user.id ===
+                                interaction.user.id
+
+                });
+
+
+            collector.on(
+                'collect',
+                async component => {
+
+                    const selected =
+                        component.values?.[0];
+
+
+                    if (
+                        !selected
+                    ) {
+
+                        return;
+                    }
+
+
+                    await finish(
+                        async () => {
+
+                            collector.stop(
+                                'selected'
+                            );
+
+
+                            try {
+
+                                await component.deferUpdate();
+
+                            } catch (error) {
+
+                                console.warn(
+                                    '[PORTPACK SKY] deferUpdate:',
+                                    error.message
+                                );
+                            }
+
+
+                            await safeEditReply(
+                                interaction,
+                                {
+                                    content:
+                                        `## 🌌 Sky selected\n\n` +
+                                        `**${selected}**\n\n` +
+                                        `⏳ Continuing with PortPack...`,
+
+                                    components: [],
+                                    embeds: [],
+                                    attachments: []
+                                }
+                            );
+
+
+                            resolve(
+                                selected
+                            );
+                        }
+                    );
+                }
+            );
+
+
+            collector.on(
+                'end',
+                async (
+                    collected,
+                    reason
+                ) => {
+
+                    if (
+                        finished
+                    ) {
+                        return;
+                    }
+
+
+                    if (
+                        reason ===
+                        'selected'
+                    ) {
+                        return;
+                    }
+
+
+                    await finish(
+                        async () => {
+
+                            await safeEditReply(
+                                interaction,
+                                {
+                                    content:
+                                        `## 🌌 Sky selection cancelled\n\n` +
+                                        `⏱️ No Sky was selected within the time limit.`,
+
+                                    components: [],
+                                    embeds: [],
+                                    attachments: []
+                                }
+                            );
+
+
+                            reject(
+                                new Error(
+                                    'The Sky selection timed out.'
+                                )
+                            );
+                        }
+                    );
+                }
+            );
+        }
+    );
+}
+
+
+
+// ============================================================
+// RESOLUTION / CROPPING HELPERS
+// ============================================================
+
+function getCropTargetSize(
+    width,
+    height
+) {
+
+    const smallestSide =
+        Math.min(
+            Number(width),
+            Number(height)
+        );
+
+
+    // Pick the largest valid Minecraft texture size that fits inside
+    // the image. For the common cases from Resource Packs this gives:
+    // 16x64 -> 16x16 and 32x128 -> 32x32.
+    const possibleSizes =
+        VALID_SIZES.filter(
+            size =>
+                size <= smallestSide
+        );
+
+
+    if (
+        possibleSizes.length === 0
+    ) {
+
+        return null;
+    }
+
+
+    return Math.max(
+        ...possibleSizes
+    );
+}
+
+
+async function findInvalidSquareTextures(
+    textures
+) {
+
+    const invalid = [];
+
+    await Promise.all(
+        textures.map(
+            async texture => {
+
+                const metadata =
+                    await sharp(
+                        texture.imagePath
+                    ).metadata();
+
+                const width =
+                    metadata.width;
+
+                const height =
+                    metadata.height;
+
+                if (
+                    !width ||
+                    !height
+                ) {
+
+                    throw new Error(
+                        `No se pudo detectar la resolución de ${texture.imageName}.`
+                    );
+                }
+
+
+                const validSquare =
+                    width === height &&
+                    VALID_SIZES.includes(
+                        width
+                    );
+
+                if (
+                    validSquare
+                ) {
+
+                    return;
+                }
+
+
+                const targetSize =
+                    getCropTargetSize(
+                        width,
+                        height
+                    );
+
+
+                if (
+                    !targetSize
+                ) {
+
+                    throw new Error(
+                        `${texture.imageName} tiene resolución ${width}x${height} y no hay una resolución permitida (${VALID_SIZES.map(size => `${size}x${size}`).join(', ')}) que pueda obtenerse mediante recorte.`
+                    );
+                }
+
+
+                invalid.push({
+                    ...texture,
+                    width,
+                    height,
+                    targetSize
+                });
+            }
+        )
+    );
+
+
+    return invalid;
+}
+
+
+async function cropTextureToSquare(
+    imagePath,
+    targetSize
+) {
+
+    const tempPath =
+        `${imagePath}.cropping.tmp.png`;
+
+
+    await sharp(
+        imagePath
+    )
+        .extract({
+            left: 0,
+            top: 0,
+            width: targetSize,
+            height: targetSize
+        })
+        .png()
+        .toFile(
+            tempPath
+        );
+
+
+    fs.renameSync(
+        tempPath,
+        imagePath
+    );
+}
+
+
+async function confirmCropInvalidTextures(
+    interaction,
+    invalidTextures
+) {
+
+    const customPrefix =
+        `portpack_crop_${Date.now()}_${Math.random()
+            .toString(36)
+            .slice(2, 8)}`;
+
+    const yesId =
+        `${customPrefix}_yes`;
+
+    const noId =
+        `${customPrefix}_no`;
+
+
+    const lines =
+        invalidTextures.map(
+            texture =>
+                `• **${texture.imageName}** — ${texture.width}x${texture.height} → **${texture.targetSize}x${texture.targetSize}**`
+        );
+
+
+    const content =
+        `## Incompatible resolution\n\n` +
+        `Found **${invalidTextures.length}** texture(s) that dont have an allowed square resolution\n\n` +
+        lines.join('\n') +
+        `\n\n✂️ If you choose **Cut**, PortPack will crop all those textures to the first valid resolution it can get and then continue normally with **texture upload, Solidify/Blender, MeshId, etc.**\n\n` +
+        `Do you want to trim them automatically?`;
+
+
+    await safeEditReply(
+        interaction,
+        {
+            content:
+                content.slice(
+                    0,
+                    1900
+                ),
+
+            components: [
+                new ActionRowBuilder()
+                    .addComponents(
+                        new ButtonBuilder()
+                            .setCustomId(
+                                yesId
+                            )
+                            .setLabel(
+                                '✂️ Yes, cut and continue'
+                            )
+                            .setStyle(
+                                ButtonStyle.Success
+                            ),
+
+                        new ButtonBuilder()
+                            .setCustomId(
+                                noId
+                            )
+                            .setLabel(
+                                '❌ No, cancel'
+                            )
+                            .setStyle(
+                                ButtonStyle.Danger
+                            )
+                    )
+            ]
+        }
+    );
+
+
+    const replyMessage =
+        await interaction.fetchReply();
+
+
+    return new Promise(
+        (resolve, reject) => {
+
+            let done = false;
+
+            const collector =
+                replyMessage.createMessageComponentCollector({
+                    time: 120000,
+                    filter:
+                        component =>
+                            (
+                                component.customId === yesId ||
+                                component.customId === noId
+                            ) &&
+                            component.user.id ===
+                                interaction.user.id
+                });
+
+
+            collector.on(
+                'collect',
+                async component => {
+
+                    if (done) {
+                        return;
+                    }
+
+                    done = true;
+                    collector.stop(
+                        component.customId === yesId
+                            ? 'yes'
+                            : 'no'
+                    );
+
+
+                    try {
+                        await component.deferUpdate();
+                    } catch (error) {}
+
+
+                    if (
+                        component.customId === yesId
+                    ) {
+
+                        await safeEditReply(
+                            interaction,
+                            {
+                                content:
+                                    `## Cutting textures...\n\n` +
+                                    `**${invalidTextures.length}** texture(s) will be cut, and then PortPack will continue with the normal processing.`,
+                                components: []
+                            }
+                        );
+
+                        resolve(true);
+                        return;
+                    }
+
+
+                    await safeEditReply(
+                        interaction,
+                        {
+                            content:
+                                `## PortPack canceled\n\n` +
+                                `The textures with incompatible resolution weren't cropped.`,
+                            components: []
+                        }
+                    );
+
+                    resolve(false);
+                }
+            );
+
+
+            collector.on(
+                'end',
+                async (collected, reason) => {
+
+                    if (done) {
+                        return;
+                    }
+
+                    done = true;
+
+                    if (reason === 'yes') {
+                        resolve(true);
+                        return;
+                    }
+
+
+                    await safeEditReply(
+                        interaction,
+                        {
+                            content:
+                                `## ❌ Selection canceled\n\n` +
+                                `The trimming question wasnt answered within the time limit.`,
+                            components: []
+                        }
+                    );
+
+                    resolve(false);
+                }
+            );
+        }
+    );
+}
+
+
+// ============================================================
+// TEXTURE
+// ============================================================
+
+async function createTexture(
+    inputPath,
+    outputPath
+) {
+
+    await sharp(
+        inputPath
+    )
+        .ensureAlpha()
+        .resize(
+            FINAL_SIZE,
+            FINAL_SIZE,
+            {
+                kernel:
+                    sharp.kernel.nearest
+            }
+        )
+        .png()
+        .toFile(
+            outputPath
+        );
+}
+
+
+// ============================================================
+// BUILD JSON
 // ============================================================
 
 function buildFinalPack(
-    generatedAssets
+    generatedAssets,
+    woolAssets,
+    selectedResources
 ) {
 
     const result =
@@ -1747,15 +4259,34 @@ function buildFinalPack(
         );
 
 
+    const selectedSet =
+        new Set(
+            selectedResources || []
+        );
+
+
+    // ========================================================
+    // ITEMS
+    // ========================================================
+
     for (
         const imageName of REQUIRED_IMAGES
     ) {
+
+        if (
+            !selectedSet.has(
+                `item:${imageName}`
+            )
+        ) {
+
+            continue;
+        }
+
 
         const mapping =
             IMAGE_MAPPINGS[
                 imageName
             ];
-
 
         const generated =
             generatedAssets[
@@ -1769,46 +4300,431 @@ function buildFinalPack(
         ) {
 
             continue;
-
         }
 
-
-        // ====================================================
-        // MESH
-        // ====================================================
 
         for (
             const field of mapping.mesh
         ) {
 
-            result[field] =
-                String(
-                    generated.meshId
-                );
+            if (
+                generated.meshId
+            ) {
 
+                result[field] =
+                    String(
+                        generated.meshId
+                    );
+            }
         }
 
-
-        // ====================================================
-        // TEXTURE
-        // ====================================================
 
         for (
             const field of mapping.texture
         ) {
 
-            result[field] =
-                String(
-                    generated.textureId
-                );
+            if (
+                generated.textureId
+            ) {
 
+                result[field] =
+                    String(
+                        generated.textureId
+                    );
+            }
+        }
+    }
+
+
+    // ========================================================
+    // WOOL
+    // ========================================================
+
+    for (
+        const woolName of Object.keys(
+            woolAssets
+        )
+    ) {
+
+        if (
+            !selectedSet.has(
+                `wool:${woolName}`
+            )
+        ) {
+
+            continue;
         }
 
+
+        const wool =
+            woolAssets[
+                woolName
+            ];
+
+
+        if (
+            wool?.field &&
+            wool?.textureId
+        ) {
+
+            result[
+                wool.field
+            ] =
+                String(
+                    wool.textureId
+                );
+        }
     }
 
 
     return result;
+}
 
+
+// ============================================================
+// SEND EVERYTHING IN ONE MESSAGE
+// ============================================================
+
+async function sendPortPackResult(
+    interaction,
+    displayName,
+    compressedJson,
+    skyJsonString,
+    selectedSkyName,
+    crosshairTextureId,
+    tempDir,
+    packImagePath
+) {
+
+    const safeName =
+        String(
+            displayName ||
+            'resourcepack.zip'
+        );
+
+
+    // ========================================================
+    // CONTENT
+    // ========================================================
+
+    let content =
+        `# 📦 ${safeName}\n\n`;
+
+
+    // ========================================================
+    // MAIN JSON
+    // ========================================================
+
+    content +=
+        `## Compressed JSON:\n\n`;
+
+
+    const mainBlock =
+        '```json\n' +
+        compressedJson +
+        '\n```\n\n';
+
+
+    // ========================================================
+    // SKY JSON
+    // ========================================================
+
+    if (
+        skyJsonString &&
+        selectedSkyName
+    ) {
+
+        content +=
+            mainBlock;
+
+
+        content +=
+            `## Sky JSON\n\n` +
+            `**Sky selected:** \`${selectedSkyName}\`\n\n` +
+            `Sky1 → SkyBottom\n` +
+            `Sky2 → SkyTop\n` +
+            `Sky3 → SkyLeft\n` +
+            `Sky4 → SkyBack\n` +
+            `Sky5 → SkyRight\n` +
+            `Sky6 → SkyFront\n\n` +
+            '```json\n' +
+            skyJsonString +
+            '\n```\n\n';
+
+    } else {
+
+        content +=
+            mainBlock;
+    }
+
+
+    // ========================================================
+    // CROSSHAIR
+    // ========================================================
+
+    if (
+        crosshairTextureId
+    ) {
+
+        content +=
+            `## Crosshair\n\n` +
+            `\`Crosshair → ${crosshairTextureId}\`\n`;
+
+    } else {
+
+        content +=
+            `## Crosshair\n\n` +
+            `Crosshair was not processed\n`;
+    }
+
+
+    // ========================================================
+    // ONE MESSAGE
+    // ========================================================
+
+    if (
+        content.length <= 2000
+    ) {
+
+        await safeEditReply(
+            interaction,
+            content
+        );
+
+        await postPackHistory(
+            interaction,
+            safeName,
+            content,
+            [],
+            packImagePath
+        );
+
+        return;
+    }
+
+
+    // ========================================================
+    // SINGLE MESSAGE WITH FILES
+    // ========================================================
+
+    const attachments = [];
+
+
+    const mainJsonPath =
+        path.join(
+            tempDir,
+            'bridge_duels.json'
+        );
+
+
+    fs.writeFileSync(
+        mainJsonPath,
+        compressedJson,
+        'utf8'
+    );
+
+
+    attachments.push(
+        new AttachmentBuilder(
+            mainJsonPath,
+            {
+                name:
+                    'bridge_duels.json'
+            }
+        )
+    );
+
+
+    if (
+        skyJsonString &&
+        selectedSkyName
+    ) {
+
+        const skyJsonPath =
+            path.join(
+                tempDir,
+                'sky.json'
+            );
+
+
+        fs.writeFileSync(
+            skyJsonPath,
+            skyJsonString,
+            'utf8'
+        );
+
+
+        attachments.push(
+            new AttachmentBuilder(
+                skyJsonPath,
+                {
+                    name:
+                        'sky.json'
+                }
+            )
+        );
+    }
+
+
+    // ========================================================
+    // SHORT CONTENT
+    // ========================================================
+
+    let shortContent =
+        `# 📦 ${safeName}\n\n` +
+        `## Compressed JSON\n` +
+        `📎 \`bridge_duels.json\`\n\n`;
+
+
+    if (
+        skyJsonString &&
+        selectedSkyName
+    ) {
+
+        shortContent +=
+            `## Sky JSON — SIN comprimir\n` +
+            `📎 \`sky.json\`\n\n` +
+            `Sky1 → SkyBottom\n` +
+            `Sky2 → SkyTop\n` +
+            `Sky3 → SkyLeft\n` +
+            `Sky4 → SkyBack\n` +
+            `Sky5 → SkyRight\n` +
+            `Sky6 → SkyFront\n\n`;
+    }
+
+
+    if (
+        crosshairTextureId
+    ) {
+
+        shortContent +=
+            `## Crosshair\n` +
+            `Crosshair → \`${crosshairTextureId}\`\n\n`;
+
+    } else {
+
+        shortContent +=
+            `## Crosshair\n` +
+            `Unprocessed\n`;
+    }
+
+
+    await safeEditReply(
+        interaction,
+        {
+            content:
+                shortContent,
+
+            files:
+                attachments,
+
+            components: []
+        }
+    );
+
+    await postPackHistory(
+        interaction,
+        safeName,
+        shortContent,
+        attachments,
+        packImagePath
+    );
+}
+
+
+// ============================================================
+// PACK HISTORY FORUM
+// ============================================================
+
+async function postPackHistory(
+    interaction,
+    packName,
+    messageContent,
+    resultAttachments,
+    packImagePath
+) {
+
+    if (!packImagePath || !fs.existsSync(packImagePath)) {
+        return;
+    }
+
+    try {
+        const historyChannel =
+            interaction.guild?.channels?.cache?.find(
+                channel =>
+                    channel.name === '📋・pack-history' &&
+                    channel.type === ChannelType.GuildForum
+            );
+
+        if (!historyChannel) {
+            console.warn(
+                '[PACK-HISTORY] Forum channel #📋・pack-history was not found.'
+            );
+            return;
+        }
+
+        const historyFiles = [];
+
+        // Re-create the result attachments from their local paths so the
+        // forum post gets the same JSON/Sky files as the user's result.
+        for (const attachment of resultAttachments || []) {
+            const attachmentPath =
+                attachment?.attachment;
+
+            if (typeof attachmentPath === 'string' && fs.existsSync(attachmentPath)) {
+                historyFiles.push(
+                    new AttachmentBuilder(
+                        attachmentPath,
+                        {
+                            name: attachment.name
+                        }
+                    )
+                );
+            }
+        }
+
+        const historyPackImage =
+            new AttachmentBuilder(
+                packImagePath,
+                {
+                    name: 'pack.png'
+                }
+            );
+
+        historyFiles.push(historyPackImage);
+
+        const historyEmbed =
+            new EmbedBuilder()
+                .setTitle(`📦 ${packName}`)
+                .setDescription(
+                    'PortPack result posted automatically.'
+                )
+                .setImage('attachment://pack.png')
+                .setTimestamp();
+
+        await historyChannel.threads.create({
+            name: (String(packName).toLowerCase().endsWith('.zip')
+                ? String(packName)
+                : `${String(packName)}.zip`)
+                .slice(0, 100),
+
+            message: {
+                content: messageContent,
+                embeds: [historyEmbed],
+                files: historyFiles
+            }
+        });
+
+        console.log(
+            `[PACK-HISTORY] History post created: ${packName}`
+        );
+
+    } catch (historyError) {
+        console.error(
+            '[PACK-HISTORY] Could not create history post:',
+            historyError
+        );
+    }
 }
 
 
@@ -1817,34 +4733,21 @@ function buildFinalPack(
 // ============================================================
 
 async function generateMeshWithBlender(
-
     texturePath,
-
     originalImagePath,
-
     fbxPath,
-
     blendPath,
-
     originalSize,
-
     rotationX,
-
     rotationY,
-
     rotationZ
-
 ) {
 
     const scriptPath =
         path.join(
-
             __dirname,
-
             '..',
-
             'create_image_mesh.py'
-
         );
 
 
@@ -1855,11 +4758,8 @@ async function generateMeshWithBlender(
     ) {
 
         throw new Error(
-
             `No existe create_image_mesh.py:\n${scriptPath}`
-
         );
-
     }
 
 
@@ -1870,209 +4770,79 @@ async function generateMeshWithBlender(
     ) {
 
         throw new Error(
-
             `No se encontró Blender en:\n${BLENDER_PATH}`
-
         );
-
     }
 
 
     console.log(
-        '[BLENDER] Starting...'
+        `[BLENDER] Rotación → X:${rotationX} Y:${rotationY} Z:${rotationZ}`
     );
 
 
     const command =
-
         `"${BLENDER_PATH}" ` +
-
         `--factory-startup ` +
-
         `--background ` +
-
         `--python "${scriptPath}" ` +
-
         `-- ` +
-
         `"${texturePath}" ` +
-
         `"${originalImagePath}" ` +
-
         `"${fbxPath}" ` +
-
         `"${blendPath}" ` +
-
         `${originalSize} ` +
-
         `${rotationX} ` +
-
         `${rotationY} ` +
-
         `${rotationZ}`;
-
-
-    console.log(
-        '[BLENDER] Command prepared.'
-    );
-
-
-    let stdout = '';
-
-    let stderr = '';
 
 
     try {
 
         const result =
             await execPromise(
-
                 command,
-
                 {
-
                     timeout:
-                        180000,
+                        BLENDER_TIMEOUT,
 
                     maxBuffer:
-                        50 * 1024 * 1024
-
+                        30 * 1024 * 1024
                 }
-
             );
 
 
-        stdout =
-            result.stdout ||
-            '';
+        const output =
+            `${result.stdout || ''}\n${result.stderr || ''}`;
 
 
-        stderr =
-            result.stderr ||
-            '';
+        if (
+            /Traceback \(most recent call last\):/i.test(
+                output
+            )
+        ) {
 
+            throw new Error(
+                `Blender produjo un error:\n${output.slice(-5000)}`
+            );
+        }
 
     } catch (error) {
 
-        stdout =
-            error.stdout ||
-            '';
-
-
-        stderr =
-            error.stderr ||
-            '';
+        console.error(
+            '[BLENDER]',
+            error.stdout || ''
+        );
 
 
         console.error(
-            '[BLENDER] Process error.'
-        );
-
-
-        if (
-            stdout
-        ) {
-
-            console.error(
-                '[BLENDER STDOUT]',
-                stdout
-            );
-
-        }
-
-
-        if (
-            stderr
-        ) {
-
-            console.error(
-                '[BLENDER STDERR]',
-                stderr
-            );
-
-        }
-
-
-        throw new Error(
-
-            `Blender falló durante la generación del mesh.\n\n` +
-
-            `${error.message || 'Error desconocido'}\n\n` +
-
-            `Revisa la consola para ver el error de Python.`
-
-        );
-
-    }
-
-
-    if (
-        stdout
-    ) {
-
-        console.log(
-            '[BLENDER STDOUT]',
-            stdout
-        );
-
-    }
-
-
-    if (
-        stderr
-    ) {
-
-        console.log(
             '[BLENDER STDERR]',
-            stderr
+            error.stderr || ''
         );
 
-    }
-
-
-    const blenderOutput =
-        `${stdout}\n${stderr}`;
-
-
-    if (
-        /create_image_mesh\.py.*SyntaxError:/is.test(
-            blenderOutput
-        )
-    ) {
 
         throw new Error(
-
-            `create_image_mesh.py tiene un error de Python:\n\n` +
-
-            blenderOutput.slice(
-                -8000
-            )
-
+            `Blender falló:\n${error.message}`
         );
-
-    }
-
-
-    if (
-        /File ".*create_image_mesh\.py".*line/i.test(
-            blenderOutput
-        ) &&
-
-        /Traceback \(most recent call last\):/i.test(
-            blenderOutput
-        )
-    ) {
-
-        throw new Error(
-
-            `El script de Blender produjo un error:\n\n` +
-
-            blenderOutput.slice(
-                -8000
-            )
-
-        );
-
     }
 
 
@@ -2083,13 +4853,8 @@ async function generateMeshWithBlender(
     ) {
 
         throw new Error(
-
-            `Blender terminó pero NO creó el FBX:\n` +
-
-            `${fbxPath}`
-
+            `Blender terminó pero no creó el FBX:\n${fbxPath}`
         );
-
     }
 
 
@@ -2106,42 +4871,25 @@ async function generateMeshWithBlender(
         throw new Error(
             'El FBX fue creado pero está vacío.'
         );
-
     }
-
-
-    console.log(
-
-        `[BLENDER] FBX successfully created: ` +
-
-        `${stats.size} bytes`
-
-    );
-
 }
 
 
 // ============================================================
-// ROBLOX ASSET UPLOAD
+// ROBLOX UPLOAD
 // ============================================================
 
 async function uploadAsset(
-
     filePath,
-
     assetType,
-
     name
-
 ) {
 
     const apiKey =
         process.env.ROBLOX_API_KEY;
 
-
     const creatorId =
         process.env.ROBLOX_CREATOR_ID;
-
 
     const isGroup =
         String(
@@ -2155,58 +4903,13 @@ async function uploadAsset(
     ) {
 
         throw new Error(
-
             'Faltan ROBLOX_API_KEY o ROBLOX_CREATOR_ID en .env.'
-
         );
-
     }
 
 
-    if (
-        !fs.existsSync(
-            filePath
-        )
-    ) {
-
-        throw new Error(
-
-            `No existe el archivo:\n${filePath}`
-
-        );
-
-    }
-
-
-    const stats =
-        fs.statSync(
-            filePath
-        );
-
-
-    if (
-        stats.size <= 0
-    ) {
-
-        throw new Error(
-
-            `El archivo está vacío:\n${filePath}`
-
-        );
-
-    }
-
-
-    let createRes;
-
-
-    // ========================================================
-    // CREAR ASSET
-    // ========================================================
-
-    createRes =
+    const result =
         await retryOperation(
-
             async () => {
 
                 const form =
@@ -2215,185 +4918,95 @@ async function uploadAsset(
 
                 const creator =
                     isGroup
-
                         ? {
-
                             groupId:
                                 String(
                                     creatorId
                                 )
-
                         }
-
                         : {
-
                             userId:
                                 String(
                                     creatorId
                                 )
-
                         };
 
 
-                const requestData = {
-
-                    assetType,
-
-                    displayName:
-                        name,
-
-                    description:
-                        'Generado automáticamente por RobloxImageBot',
-
-                    creationContext: {
-
-                        creator
-
-                    }
-
-                };
-
-
                 form.append(
-
                     'request',
+                    JSON.stringify({
+                        assetType,
 
-                    JSON.stringify(
-                        requestData
-                    )
+                        displayName:
+                            name,
 
+                        description:
+                            'Generado automáticamente por RobloxImageBot',
+
+                        creationContext: {
+                            creator
+                        }
+                    })
                 );
 
 
-                let contentType;
-
-
-                if (
-                    assetType === 'Model'
-                ) {
-
-                    contentType =
-                        'model/fbx';
-
-                } else if (
-                    assetType === 'Image'
-                ) {
-
-                    contentType =
-                        'image/png';
-
-                } else {
-
-                    throw new Error(
-
-                        `AssetType no soportado: ${assetType}`
-
-                    );
-
-                }
-
-
                 form.append(
-
                     'fileContent',
-
                     fs.createReadStream(
                         filePath
                     ),
-
                     {
-
                         filename:
                             path.basename(
                                 filePath
                             ),
 
-                        contentType
-
+                        contentType:
+                            assetType === 'Model'
+                                ? 'model/fbx'
+                                : 'image/png'
                     }
-
                 );
 
 
-                try {
+                return axios.post(
+                    'https://apis.roblox.com/assets/v1/assets',
+                    form,
+                    {
+                        headers: {
+                            ...form.getHeaders(),
 
-                    return await axios.post(
+                            'x-api-key':
+                                apiKey
+                        },
 
-                        'https://apis.roblox.com/assets/v1/assets',
+                        maxContentLength:
+                            Infinity,
 
-                        form,
+                        maxBodyLength:
+                            Infinity,
 
-                        {
-
-                            headers: {
-
-                                ...form.getHeaders(),
-
-                                'x-api-key':
-                                    apiKey
-
-                            },
-
-                            maxContentLength:
-                                Infinity,
-
-                            maxBodyLength:
-                                Infinity,
-
-                            timeout:
-                                60000
-
-                        }
-
-                    );
-
-                } catch (error) {
-
-                    const details =
-                        error.response?.data
-
-                            ? JSON.stringify(
-                                error.response.data
-                            )
-
-                            : error.message;
-
-
-                    throw new Error(
-
-                        `Roblox rechazó ${assetType}:\n${details}`
-
-                    );
-
-                }
-
+                        timeout:
+                            45000
+                    }
+                );
             },
 
-            `subida ${assetType} ${name}`,
-
-            MAX_RETRIES
-
+            `subida ${assetType} ${name}`
         );
 
 
     const operationPath =
-        createRes.data?.path;
+        result.data?.path;
 
 
-    if (
-        !operationPath
-    ) {
+    if (!operationPath) {
 
         throw new Error(
-
-            `Roblox no devolvió operation path:\n` +
-
-            JSON.stringify(
-                createRes.data
-            )
-
+            `Roblox no devolvió operation path:\n${JSON.stringify(
+                result.data
+            )}`
         );
-
     }
 
 
@@ -2403,183 +5016,96 @@ async function uploadAsset(
             .pop();
 
 
-    console.log(
-        `[ROBLOX] Operation: ${operationId}`
-    );
-
-
-    // ========================================================
-    // ESPERAR OPERACIÓN
-    // ========================================================
-
-    let assetId = null;
-
-
     for (
         let i = 0;
-        i < 40;
+        i < ASSET_POLL_ATTEMPTS;
         i++
     ) {
 
         await sleep(
-            1500
+            ASSET_POLL_INTERVAL
         );
 
 
-        try {
+        const statusRes =
+            await retryOperation(
+                () =>
+                    axios.get(
+                        `https://apis.roblox.com/assets/v1/operations/${operationId}`,
+                        {
+                            headers: {
+                                'x-api-key':
+                                    apiKey
+                            },
 
-            const statusRes =
-                await retryOperation(
+                            timeout:
+                                8000
+                        }
+                    ),
 
-                    async () => {
+                `consulta operación ${operationId}`,
 
-                        return axios.get(
+                1
+            );
 
-                            `https://apis.roblox.com/assets/v1/operations/${operationId}`,
 
-                            {
+        const data =
+            statusRes.data;
 
-                                headers: {
 
-                                    'x-api-key':
-                                        apiKey
+        if (
+            data.done === true
+        ) {
 
-                                },
+            if (
+                data.error
+            ) {
 
-                                timeout:
-                                    15000
-
-                            }
-
-                        );
-
-                    },
-
-                    `consulta de operación ${operationId}`,
-
-                    2
-
+                throw new Error(
+                    data.error.message ||
+                    JSON.stringify(
+                        data.error
+                    )
                 );
-
-
-            const data =
-                statusRes.data;
-
-
-            console.log(
-
-                `[ROBLOX] ${assetType} ${name} ` +
-
-                `check ${i + 1}/40: ${data.done}`
-
-            );
-
-
-            if (
-                data.done === true
-            ) {
-
-                if (
-                    data.error
-                ) {
-
-                    throw new Error(
-
-                        data.error.message ||
-
-                        JSON.stringify(
-                            data.error
-                        )
-
-                    );
-
-                }
-
-
-                assetId =
-                    data.response?.assetId;
-
-
-                if (
-                    !assetId
-                ) {
-
-                    throw new Error(
-
-                        `Roblox terminó pero no devolvió assetId:\n` +
-
-                        JSON.stringify(
-                            data
-                        )
-
-                    );
-
-                }
-
-
-                break;
-
             }
 
 
-        } catch (error) {
+            const assetId =
+                data.response?.assetId;
 
-            console.warn(
 
-                `[ROBLOX] Error checking operation ` +
+            if (!assetId) {
 
-                `${i + 1}/40: ${error.message}`
+                throw new Error(
+                    `Roblox terminó la operación pero no devolvió assetId:\n${JSON.stringify(
+                        data
+                    )}`
+                );
+            }
 
+
+            applyOpenUse(
+                assetId,
+                apiKey
+            ).catch(
+                error =>
+                    console.warn(
+                        `[ROBLOX] Open Use ${assetId}:`,
+                        error.message
+                    )
             );
 
 
-            if (
-                /Roblox terminó pero no devolvió assetId/i.test(
-                    error.message
-                )
-            ) {
-
-                throw error;
-
-            }
-
+            return String(
+                assetId
+            );
         }
-
     }
 
 
-    if (
-        !assetId
-    ) {
-
-        throw new Error(
-
-            `Tiempo de espera agotado subiendo ${name}.`
-
-        );
-
-    }
-
-
-    console.log(
-        `[ROBLOX] Asset created: ${assetId}`
+    throw new Error(
+        `Tiempo de espera agotado subiendo ${name}.`
     );
-
-
-    // ========================================================
-    // OPEN USE
-    // ========================================================
-
-    await applyOpenUse(
-        assetId,
-        apiKey
-    );
-
-
-    return String(
-        assetId
-    );
-
 }
 
 
@@ -2588,812 +5114,437 @@ async function uploadAsset(
 // ============================================================
 
 async function applyOpenUse(
-
     assetId,
-
     apiKey
-
 ) {
 
-    try {
+    await retryOperation(
+        async () => {
 
-        await retryOperation(
+            await axios.patch(
+                'https://apis.roblox.com/asset-permissions-api/v1/assets/permissions',
 
-            async () => {
+                {
+                    subjectType:
+                        'All',
 
-                try {
+                    subjectId:
+                        null,
 
-                    await axios.patch(
+                    action:
+                        'Use',
 
-                        'https://apis.roblox.com/asset-permissions-api/v1/assets/permissions',
-
+                    requests: [
                         {
-
-                            subjectType:
-                                'All',
-
-                            subjectId:
-                                null,
-
-                            action:
-                                'Use',
-
-                            requests: [
-
-                                {
-
-                                    assetId:
-                                        Number(
-                                            assetId
-                                        )
-
-                                }
-
-                            ]
-
-                        },
-
-                        {
-
-                            headers: {
-
-                                'x-api-key':
-                                    apiKey,
-
-                                'Content-Type':
-                                    'application/json'
-
-                            },
-
-                            timeout:
-                                15000
-
+                            assetId:
+                                Number(
+                                    assetId
+                                )
                         }
+                    ]
+                },
 
-                    );
+                {
+                    headers: {
+                        'x-api-key':
+                            apiKey,
 
-                } catch (error) {
+                        'Content-Type':
+                            'application/json'
+                    },
 
-                    throw new Error(
-
-                        error.response?.data
-
-                            ? JSON.stringify(
-                                error.response.data
-                            )
-
-                            : error.message
-
-                    );
-
+                    timeout:
+                        8000
                 }
+            );
+        },
 
-            },
+        `Open Use ${assetId}`,
 
-            `Open Use ${assetId}`,
-
-            MAX_RETRIES
-
-        );
-
-
-        console.log(
-            `[ROBLOX] Open Use applied: ${assetId}`
-        );
-
-
-    } catch (error) {
-
-        console.warn(
-
-            '[ROBLOX] No se pudo aplicar Open Use:',
-
-            error.message
-
-        );
-
-    }
-
+        1
+    );
 }
 
 
 // ============================================================
-// LUAU → MESH ID
-// ============================================================
-//
-// ESTA ES LA PARTE IMPORTANTE DE LA CORRECCIÓN.
-//
-// Antes:
-//
-// Textura 1 ──┐
-// Textura 2 ──┼──> varias tareas Luau simultáneas
-// Textura 3 ──┘
-//
-// Ahora:
-//
-// Textura 1 ──> [COLA] ──> Luau
-// Textura 2 ──> [COLA] ──> Luau
-// Textura 3 ──> [COLA] ──> Luau
-//
-// Solo una tarea se crea a la vez.
-//
+// LUAU
 // ============================================================
 
-async function extractMeshIdWithLuau(
-    modelId
-) {
-
-    // --------------------------------------------------------
-    // Meter la operación en la cola global.
-    // --------------------------------------------------------
-
-    const previous =
-        luauQueue;
-
-
-    let release;
-
-    const current =
-        new Promise(
-            resolve => {
-                release = resolve;
-            }
-        );
-
-
-    luauQueue =
-        previous
-            .catch(() => {})
-            .then(
-                () => current
-            );
-
-
-    await previous.catch(() => {});
-
-
-    try {
-
-        console.log();
-        console.log(
-            `[LUAU] ============================================`
-        );
-        console.log(
-            `[LUAU] Esperando turno para ModelId ${modelId}`
-        );
-        console.log(
-            `[LUAU] ============================================`
-        );
-
-
-        const result =
-            await extractMeshIdWithLuauInternal(
-                modelId
-            );
-
-
-        return result;
-
-
-    } finally {
-
-        release();
-
-    }
-
-}
-
-
-// ============================================================
-// LUAU INTERNO
-// ============================================================
-
-async function extractMeshIdWithLuauInternal(
-    modelId
+async function extractAllMeshIdsWithLuau(
+    entries
 ) {
 
     const apiKey =
         process.env.ROBLOX_API_KEY;
 
 
-    if (
-        !apiKey
-    ) {
+    if (!apiKey) {
 
         throw new Error(
             'Falta ROBLOX_API_KEY.'
         );
-
     }
+
+
+    const modelsLua =
+        entries
+            .map(
+                entry => {
+
+                    const imageName =
+                        JSON.stringify(
+                            String(
+                                entry.imageName
+                            )
+                        );
+
+
+                    const modelId =
+                        Number(
+                            entry.modelId
+                        );
+
+
+                    if (
+                        !Number.isFinite(
+                            modelId
+                        )
+                    ) {
+
+                        throw new Error(
+                            `ModelId inválido para ${entry.imageName}: ${entry.modelId}`
+                        );
+                    }
+
+
+                    return (
+                        `    {\n` +
+                        `        imageName = ${imageName},\n` +
+                        `        modelId = ${modelId}\n` +
+                        `    }`
+                    );
+                }
+            )
+            .join(',\n');
 
 
     const luauScript = `
 
-local InsertService = game:GetService("InsertService")
+local InsertService =
+    game:GetService("InsertService")
 
-local success, result = pcall(function()
+local HttpService =
+    game:GetService("HttpService")
 
-    local model = InsertService:LoadAsset(${modelId})
+local models = {
+${modelsLua}
+}
 
-    if not model then
-        error("InsertService no devolvió Model")
-    end
+local output = {}
 
-    local meshPart =
-        model:FindFirstChildWhichIsA(
-            "MeshPart",
-            true
+for _, item in ipairs(models) do
+
+    local success = false
+    local result = nil
+
+    for attempt = 1, 3 do
+
+        success, result = pcall(function()
+
+            local model =
+                InsertService:LoadAsset(
+                    item.modelId
+                )
+
+            if not model then
+                error(
+                    "InsertService no devolvió Model"
+                )
+            end
+
+            local meshPart =
+                model:FindFirstChildWhichIsA(
+                    "MeshPart",
+                    true
+                )
+
+            if not meshPart then
+                error(
+                    "No se encontró MeshPart"
+                )
+            end
+
+            local meshId =
+                meshPart.MeshId
+
+            local id =
+                string.match(
+                    tostring(meshId),
+                    "%d+"
+                )
+
+            if not id then
+                error(
+                    "No se pudo extraer MeshId"
+                )
+            end
+
+            output[item.imageName] = id
+
+        end)
+
+        if success then
+            break
+        end
+
+        warn(
+            "[PortPack] LoadAsset falló para " ..
+            item.imageName ..
+            " (intento " ..
+            tostring(attempt) ..
+            "/3): " ..
+            tostring(result)
         )
 
-    if not meshPart then
-        error("No se encontró ningún MeshPart")
+        if attempt < 3 then
+            task.wait(2)
+        end
     end
 
-    local meshId = meshPart.MeshId
+    if not success then
 
-    local id =
-        string.match(
-            tostring(meshId),
-            "%d+"
+        error(
+            item.imageName ..
+            ": " ..
+            tostring(result)
         )
 
-    if not id then
-        error("No se pudo extraer el MeshId")
     end
 
-    return id
-
-end)
-
-if success then
-    return result
-else
-    error(tostring(result))
 end
+
+return HttpService
+    :JSONEncode(
+        output
+    )
 
 `;
 
 
-    // ========================================================
-    // REINTENTAR CREACIÓN LUau
-    // ========================================================
+    const createRes =
+        await retryOperation(
+            async () => {
 
-    let taskPath =
-        null;
-
-
-    let lastCreationError =
-        null;
-
-
-    const MAX_LUAU_ATTEMPTS =
-        5;
-
-
-    for (
-        let attempt = 1;
-        attempt <= MAX_LUAU_ATTEMPTS;
-        attempt++
-    ) {
-
-        try {
-
-            // ------------------------------------------------
-            // RESPETAR INTERVALO MÍNIMO
-            // ------------------------------------------------
-
-            const now =
-                Date.now();
-
-
-            const elapsed =
-                now -
-                lastLuauTaskCreation;
-
-
-            if (
-                lastLuauTaskCreation > 0 &&
-                elapsed < LUAU_MIN_INTERVAL_MS
-            ) {
-
-                const waitTime =
-                    LUAU_MIN_INTERVAL_MS -
-                    elapsed;
-
-
-                console.log(
-
-                    `[LUAU] ⏳ Esperando ${waitTime}ms ` +
-
-                    `antes de crear la siguiente tarea...`
-
-                );
-
-
-                await sleep(
-                    waitTime
-                );
-
-            }
-
-
-            console.log(
-
-                `[LUAU] Creando tarea para ModelId ${modelId} ` +
-
-                `(intento ${attempt}/${MAX_LUAU_ATTEMPTS})`
-
-            );
-
-
-            const createRes =
-                await axios.post(
-
+                return axios.post(
                     `https://apis.roblox.com/cloud/v2/universes/${UNIVERSE_ID}/places/${PLACE_ID}/luau-execution-session-tasks`,
 
                     {
-
                         script:
                             luauScript
-
                     },
 
                     {
-
                         headers: {
-
                             'x-api-key':
                                 apiKey,
 
                             'Content-Type':
                                 'application/json'
-
                         },
 
                         timeout:
-                            30000
-
+                            20000
                     }
-
                 );
+            },
 
+            'creación de tarea Luau',
 
-            // ------------------------------------------------
-            // SOLO ACTUALIZAMOS EL TIMESTAMP SI ROBLOX
-            // ACEPTÓ LA CREACIÓN.
-            // ------------------------------------------------
-
-            lastLuauTaskCreation =
-                Date.now();
-
-
-            taskPath =
-                createRes.data?.path;
-
-
-            if (
-                !taskPath
-            ) {
-
-                throw new Error(
-
-                    'Roblox no devolvió task path para Luau.'
-
-                );
-
-            }
-
-
-            console.log(
-                `[LUAU] ✅ Task creada: ${taskPath}`
-            );
-
-
-            break;
-
-
-        } catch (error) {
-
-            lastCreationError =
-                error;
-
-
-            const status =
-                error.response?.status;
-
-
-            const responseData =
-                error.response?.data;
-
-
-            console.error(
-                `[LUAU] Error creando tarea para ${modelId}.`
-            );
-
-
-            console.error(
-                `[LUAU] HTTP: ${status || 'desconocido'}`
-            );
-
-
-            console.error(
-                `[LUAU] Response:`,
-                responseData
-                    ? JSON.stringify(
-                        responseData
-                    )
-                    : error.message
-            );
-
-
-            // =================================================
-            // RATE LIMIT 429
-            // =================================================
-
-            if (
-                status === 429
-            ) {
-
-                console.warn(
-                    '[LUAU] ⚠️ Roblox devolvió HTTP 429.'
-                );
-
-
-                // ---------------------------------------------
-                // Intentar obtener Retry-After
-                // ---------------------------------------------
-
-                let retryAfter =
-                    null;
-
-
-                const headers =
-                    error.response?.headers;
-
-
-                if (
-                    headers
-                ) {
-
-                    const headerValue =
-                        headers['retry-after'] ||
-                        headers['Retry-After'];
-
-
-                    if (
-                        headerValue !== undefined
-                    ) {
-
-                        const numeric =
-                            Number(
-                                headerValue
-                            );
-
-
-                        if (
-                            Number.isFinite(
-                                numeric
-                            )
-                        ) {
-
-                            // Retry-After puede venir en segundos.
-                            retryAfter =
-                                numeric * 1000;
-
-                        }
-
-                    }
-
-                }
-
-
-                // ---------------------------------------------
-                // Roblox puede no mandar Retry-After.
-                //
-                // En ese caso usamos 120 segundos.
-                // ---------------------------------------------
-
-                const waitTime =
-                    retryAfter &&
-                    retryAfter > 0
-
-                        ? Math.max(
-                            retryAfter,
-                            LUAU_RETRY_DELAY_MS
-                        )
-
-                        : LUAU_RETRY_DELAY_MS;
-
-
-                console.warn(
-
-                    `[LUAU] ⏳ Esperando ${waitTime}ms ` +
-
-                    `antes del siguiente intento...`
-
-                );
-
-
-                await sleep(
-                    waitTime
-                );
-
-
-                continue;
-
-            }
-
-
-            // =================================================
-            // OTROS ERRORES
-            // =================================================
-
-            if (
-                attempt >= MAX_LUAU_ATTEMPTS
-            ) {
-
-                break;
-
-            }
-
-
-            const waitTime =
-                RETRY_BASE_DELAY *
-                Math.pow(
-                    2,
-                    attempt - 1
-                );
-
-
-            console.warn(
-
-                `[LUAU] Reintentando en ${waitTime}ms...`
-
-            );
-
-
-            await sleep(
-                waitTime
-            );
-
-        }
-
-    }
-
-
-    if (
-        !taskPath
-    ) {
-
-        throw new Error(
-
-            `Roblox rechazó la creación de la tarea Luau.\n` +
-
-            `${lastCreationError?.response?.data
-                ? JSON.stringify(
-                    lastCreationError.response.data
-                )
-                : lastCreationError?.message ||
-                    'Error desconocido.'}`
-
+            1
         );
 
+
+    const taskPath =
+        createRes.data?.path;
+
+
+    if (!taskPath) {
+
+        throw new Error(
+            `Roblox no devolvió task path:\n${JSON.stringify(
+                createRes.data
+            )}`
+        );
     }
-
-
-    // ========================================================
-    // ESPERAR TASK
-    // ========================================================
-
-    let meshId =
-        null;
 
 
     for (
         let i = 0;
-        i < 30;
+        i < LUAU_POLL_ATTEMPTS;
         i++
     ) {
 
         await sleep(
-            2000
+            LUAU_POLL_INTERVAL
         );
 
 
-        try {
+        const statusRes =
+            await axios.get(
+                `https://apis.roblox.com/cloud/v2/${taskPath}`,
 
-            const statusRes =
-                await retryOperation(
-
-                    async () => {
-
-                        return axios.get(
-
-                            `https://apis.roblox.com/cloud/v2/${taskPath}`,
-
-                            {
-
-                                headers: {
-
-                                    'x-api-key':
-                                        apiKey
-
-                                },
-
-                                timeout:
-                                    15000
-
-                            }
-
-                        );
-
+                {
+                    headers: {
+                        'x-api-key':
+                            apiKey
                     },
 
-                    `consulta Luau ${i + 1}/30`,
-
-                    2
-
-                );
-
-
-            const data =
-                statusRes.data;
-
-
-            const state =
-                data?.state;
-
-
-            console.log(
-                `[LUAU] ${i + 1}/30: ${state}`
+                    timeout:
+                        8000
+                }
             );
 
 
-            // =================================================
-            // COMPLETE
-            // =================================================
+        const data =
+            statusRes.data;
+
+
+        console.log(
+            `[LUAU] ${i + 1}: ${data?.state}`
+        );
+
+
+        if (
+            data?.state ===
+            'COMPLETE'
+        ) {
+
+            const raw =
+                data
+                    ?.output
+                    ?.results?.[0];
+
 
             if (
-                state === 'COMPLETE'
+                raw === undefined ||
+                raw === null
             ) {
 
-                const results =
-                    data
-                        ?.output
-                        ?.results;
+                throw new Error(
+                    'Luau terminó pero no devolvió MeshIds.'
+                );
+            }
+
+
+            try {
+
+                const parsed =
+                    typeof raw === 'string'
+                        ? JSON.parse(
+                            raw
+                        )
+                        : raw;
 
 
                 if (
-                    results &&
-                    results[0] !== undefined &&
-                    results[0] !== null
+                    !parsed ||
+                    typeof parsed !== 'object'
                 ) {
 
-                    meshId =
-                        String(
-                            results[0]
-                        );
-
-                    break;
-
+                    throw new Error(
+                        'La respuesta de Luau no es un objeto válido.'
+                    );
                 }
 
 
-                throw new Error(
-                    'Luau terminó pero no devolvió MeshId.'
+                await applyOpenUseForMeshes(
+                    parsed,
+                    apiKey
                 );
 
-            }
 
+                return parsed;
 
-            // =================================================
-            // FAILED
-            // =================================================
-
-            if (
-                state === 'FAILED' ||
-                state === 'CANCELLED'
-            ) {
+            } catch (error) {
 
                 throw new Error(
-
-                    `Luau falló: ` +
-
-                    `${data?.error?.message ||
-
-                        JSON.stringify(
-                            data?.error ||
-                            data
-                        )}`
-
+                    `No se pudo interpretar la respuesta de Luau: ${error.message}`
                 );
-
             }
-
-
-        } catch (error) {
-
-            console.warn(
-
-                `[LUAU] Error ${i + 1}/30: ${error.message}`
-
-            );
-
-
-            if (
-                /Luau falló:/i.test(
-                    error.message
-                )
-            ) {
-
-                throw error;
-
-            }
-
-
-            if (
-                /Luau terminó pero no devolvió MeshId/i.test(
-                    error.message
-                )
-            ) {
-
-                throw error;
-
-            }
-
         }
 
+
+        if (
+            data?.state ===
+                'FAILED' ||
+            data?.state ===
+                'CANCELLED'
+        ) {
+
+            throw new Error(
+                `Luau falló: ${
+                    data?.error?.message ||
+                    JSON.stringify(
+                        data?.error ||
+                        data
+                    )
+                }`
+            );
+        }
     }
 
 
-    if (
-        !meshId
-    ) {
-
-        throw new Error(
-            'Tiempo de espera agotado en Luau.'
-        );
-
-    }
-
-
-    console.log(
-        `[LUAU] MeshId extracted: ${meshId}`
+    throw new Error(
+        'Tiempo de espera agotado en Luau.'
     );
-
-
-    // ========================================================
-    // OPEN USE MESH
-    // ========================================================
-
-    await applyOpenUse(
-        meshId,
-        apiKey
-    );
-
-
-    return meshId;
-
 }
 
 
 // ============================================================
-// PROCESAMIENTO CON CONCURRENCIA
+// OPEN USE MESH
+// ============================================================
+
+async function applyOpenUseForMeshes(
+    meshIds,
+    apiKey
+) {
+
+    const ids =
+        Object.values(
+            meshIds || {}
+        )
+            .filter(Boolean);
+
+
+    await Promise.all(
+        ids.map(
+            id =>
+                applyOpenUse(
+                    id,
+                    apiKey
+                ).catch(
+                    error =>
+                        console.warn(
+                            `[ROBLOX] Open Use Mesh ${id}:`,
+                            error.message
+                        )
+                )
+        )
+    );
+}
+
+
+// ============================================================
+// CONCURRENCY
 // ============================================================
 
 async function runWithConcurrency(
-
     items,
-
     concurrency,
-
     worker
-
 ) {
 
     let nextIndex = 0;
-
-
     let firstError = null;
 
 
@@ -3410,7 +5561,6 @@ async function runWithConcurrency(
             ) {
 
                 return;
-
             }
 
 
@@ -3422,22 +5572,15 @@ async function runWithConcurrency(
 
             } catch (error) {
 
-                if (
-                    !firstError
-                ) {
+                if (!firstError) {
 
                     firstError =
                         error;
-
                 }
 
-
                 return;
-
             }
-
         }
-
     }
 
 
@@ -3449,21 +5592,14 @@ async function runWithConcurrency(
 
 
     await Promise.all(
-
         Array.from(
-
             {
-
                 length:
                     workers
-
             },
-
             () =>
                 runner()
-
         )
-
     );
 
 
@@ -3472,14 +5608,12 @@ async function runWithConcurrency(
     ) {
 
         throw firstError;
-
     }
-
 }
 
 
 // ============================================================
-// NORMALIZAR PATH
+// ZIP PATH
 // ============================================================
 
 function normalizeZipPath(
@@ -3489,28 +5623,23 @@ function normalizeZipPath(
     return String(
         filePath
     )
-
         .replace(
             /\\/g,
             '/'
         )
-
         .replace(
             /^\/+/,
             ''
         )
-
         .replace(
             /\/+/g,
             '/'
-
         );
-
 }
 
 
 // ============================================================
-// SANITIZAR
+// SANITIZE
 // ============================================================
 
 function sanitizeFileName(
@@ -3520,27 +5649,21 @@ function sanitizeFileName(
     return String(
         name
     )
-
         .replace(
             /[^a-zA-Z0-9._-]/g,
             '_'
         );
-
 }
 
 
 // ============================================================
-// REINTENTOS
+// RETRY
 // ============================================================
 
 async function retryOperation(
-
     operation,
-
     label,
-
     maxRetries = MAX_RETRIES
-
 ) {
 
     let lastError =
@@ -3567,47 +5690,13 @@ async function retryOperation(
                     );
 
 
-                console.log(
-
-                    `[RETRY] ${label} ` +
-
-                    `→ intento ${attempt + 1}/${maxRetries + 1} ` +
-
-                    `en ${delay}ms`
-
-                );
-
-
                 await sleep(
                     delay
                 );
-
             }
 
 
-            const result =
-                await operation();
-
-
-            if (
-                attempt > 0
-            ) {
-
-                console.log(
-
-                    `[RETRY] ${label} ` +
-
-                    `→ recuperado correctamente ` +
-
-                    `en intento ${attempt + 1}`
-
-                );
-
-            }
-
-
-            return result;
-
+            return await operation();
 
         } catch (error) {
 
@@ -3616,13 +5705,7 @@ async function retryOperation(
 
 
             console.warn(
-
-                `[RETRY] ${label} ` +
-
-                `→ fallo en intento ${attempt + 1}/${maxRetries + 1}: ` +
-
-                `${error.message}`
-
+                `[RETRY] ${label} → ${attempt + 1}/${maxRetries + 1}: ${error.message}`
             );
 
 
@@ -3631,41 +5714,28 @@ async function retryOperation(
             ) {
 
                 break;
-
             }
-
         }
-
     }
 
 
     throw new Error(
-
-        `${label} falló después de ` +
-
-        `${maxRetries + 1} intentos.\n\n` +
-
-        `${lastError?.message ||
-
-            'Error desconocido.'}`
-
+        `${label} falló después de ${maxRetries + 1} intentos.\n\n${
+            lastError?.message ||
+            'Error desconocido.'
+        }`
     );
-
 }
 
 
 // ============================================================
-// PROGRESO
+// PROGRESS
 // ============================================================
 
 async function updateProgress(
-
     interaction,
-
     percent,
-
     status
-
 ) {
 
     const safePercent =
@@ -3686,190 +5756,37 @@ async function updateProgress(
         );
 
 
-    const empty =
-        20 -
-        filled;
-
-
     const bar =
         '█'.repeat(
             filled
         ) +
-
         '░'.repeat(
-            empty
+            20 - filled
         );
-
-
-    const content =
-
-        `## 📦 PortPack\n\n` +
-
-        `**${safePercent}%**\n` +
-
-        `\`${bar}\`\n\n` +
-
-        `${status}`;
 
 
     return safeEditReply(
         interaction,
-        content
-    );
+        {
+            content:
+                `## 📦 PortPack\n\n` +
+                `**${safePercent}%**\n` +
+                `\`${bar}\`\n\n` +
+                `${status}`,
 
-}
-
-
-// ============================================================
-// JSON COPIABLE
-// ============================================================
-
-async function sendCopyableJson(
-
-    interaction,
-
-    json
-
-) {
-
-    const singleMessage =
-
-        '```json\n' +
-
-        json +
-
-        '\n```';
-
-
-    if (
-        singleMessage.length <= 2000
-    ) {
-
-        await safeEditReply(
-
-            interaction,
-
-            singleMessage
-
-        );
-
-
-        return;
-
-    }
-
-
-    await safeEditReply(
-
-        interaction,
-
-        '⚠️ El JSON supera el límite de un solo mensaje de Discord. Se enviará dividido en partes.'
-
-    );
-
-
-    const chunks =
-        splitText(
-            json,
-            1800
-        );
-
-
-    for (
-        let i = 0;
-        i < chunks.length;
-        i++
-    ) {
-
-        const content =
-
-            '```json\n' +
-
-            chunks[i] +
-
-            '\n```';
-
-
-        try {
-
-            await interaction.followUp({
-
-                content
-
-            });
-
-        } catch (error) {
-
-            console.error(
-
-                '[DISCORD] Error enviando parte JSON:',
-
-                error.message
-
-            );
-
-            break;
-
+            components: []
         }
-
-    }
-
+    );
 }
 
 
 // ============================================================
-// SPLIT TEXT
-// ============================================================
-
-function splitText(
-
-    text,
-
-    maxLength
-
-) {
-
-    const chunks = [];
-
-
-    for (
-        let i = 0;
-        i < text.length;
-        i += maxLength
-    ) {
-
-        chunks.push(
-
-            text.slice(
-
-                i,
-
-                i + maxLength
-
-            )
-
-        );
-
-    }
-
-
-    return chunks;
-
-}
-
-
-// ============================================================
-// SAFE EDIT REPLY
+// SAFE EDIT
 // ============================================================
 
 async function safeEditReply(
-
     interaction,
-
-    content,
-
-    files = undefined
-
+    content
 ) {
 
     try {
@@ -3879,67 +5796,72 @@ async function safeEditReply(
             !interaction.replied
         ) {
 
-            console.warn(
-                '[DISCORD] Interaction no reconocida.'
-            );
-
             return false;
-
         }
-
-
-        const payload = {
-
-            content
-
-        };
 
 
         if (
-            files !== undefined
+            typeof content === 'string'
         ) {
 
-            payload.files =
-                files;
+            await interaction.editReply({
+                content,
+                components: []
+            });
 
+        } else {
+
+            await interaction.editReply(
+                content
+            );
         }
-
-
-        await interaction.editReply(
-            payload
-        );
 
 
         return true;
 
-
     } catch (error) {
 
-        if (
-            error?.code === 10062
-        ) {
-
-            console.error(
-                '[DISCORD] Unknown interaction en editReply().'
-            );
-
-        } else {
-
-            console.error(
-
-                '[DISCORD] Error editReply():',
-
-                error.message
-
-            );
-
-        }
-
+        console.error(
+            '[DISCORD] editReply:',
+            error.message
+        );
 
         return false;
-
     }
+}
 
+
+// ============================================================
+// HTML ENTITIES
+// ============================================================
+
+function decodeHtmlEntities(
+    value
+) {
+
+    return String(
+        value
+    )
+        .replace(
+            /&amp;/g,
+            '&'
+        )
+        .replace(
+            /&quot;/g,
+            '"'
+        )
+        .replace(
+            /&#39;/g,
+            "'"
+        )
+        .replace(
+            /&lt;/g,
+            '<'
+        )
+        .replace(
+            /&gt;/g,
+            '>'
+        );
 }
 
 
@@ -3952,17 +5874,10 @@ function sleep(
 ) {
 
     return new Promise(
-
         resolve =>
-
             setTimeout(
-
                 resolve,
-
                 ms
-
             )
-
     );
-
 }
