@@ -75,7 +75,7 @@ npm start
 
 Don't post tokens, API keys, cookies, `.env` files, or other secrets. If a real credential was exposed, revoke it and generate a new one before posting the repository.
 
-## Estructura
+## Estructure
 
 ```text
 RobloxImageBot/
