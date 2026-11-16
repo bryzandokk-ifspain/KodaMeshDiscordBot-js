@@ -1,4 +1,4 @@
-# RobloxImageBot
+# KodaMesh Bot
 
 Bot de Discord para flujos de trabajo de recursos de Roblox y conversión de resource packs de Minecraft Java.
 
