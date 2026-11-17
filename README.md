@@ -1,4 +1,4 @@
-# RobloxImageBot
+# KodaMesh Discord Bot
 
 A Discord bot for working with Roblox assets and Minecraft-style texture packs. It includes image and audio uploads, texture-pack conversion, avatar tools, and optional AI chat.
 
